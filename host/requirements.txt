@@ -1,0 +1,37 @@
+# Host (laptop) Python dependencies
+# Install with:
+#   pip install -r requirements.txt
+
+# HTTP client — used by detection_logger.py and viewer.py threshold control
+requests>=2.31.0
+
+# Computer vision — used by viewer.py (optional, browser is the default)
+opencv-python>=4.8.0
+
+# Numerical computing
+numpy>=1.24.0
+
+# Web server — used by webcam_streamer.py (laptop webcam → MJPEG for board)
+flask>=2.3.0
+
+# ML model export — used by scripts/prepare_models.sh and make model
+# Exports YOLOv8 .pt → int8 TFLite for Neutron NPU compilation
+ultralytics>=8.0.0
+
+# Ultralytics TFLite/ONNX export extras (auto-installed by ultralytics but
+# pinned here to avoid version conflicts and "not found" warnings)
+tf-keras<=2.19.0
+sng4onnx>=1.0.1
+onnx-graphsurgeon>=0.3.26
+ai-edge-litert>=1.2.0
+
+# ONNX runtime — model conversion and inference on laptop
+onnx>=1.14.0
+onnxruntime>=1.16.0
+
+# TensorFlow — required by tf-keras and ai-edge-litert for TFLite int8 export
+# Note: the board uses tflite_runtime (lightweight, pre-installed in BSP)
+tensorflow>=2.13.0,<=2.19.0
+
+# FlatBuffers — required by scripts/split_model.py for writing sub-model TFLite files
+flatbuffers>=23.5.26

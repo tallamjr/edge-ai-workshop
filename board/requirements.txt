@@ -1,0 +1,27 @@
+# Board-side Python dependencies
+# Installed into a venv on the board via:
+#   make board-deps
+# which runs:
+#   python3 -m venv --system-site-packages .venv
+#   .venv/bin/pip install -r requirements.txt
+#
+# --system-site-packages exposes the BSP-preinstalled tflite_runtime
+# without needing to reinstall it here.
+
+# Computer vision
+opencv-python-headless>=4.8.0
+
+# Web streaming server
+flask>=3.0.0
+
+# Numerical computing
+numpy>=1.24.0
+
+# Optional: GPIO control
+# gpiod>=2.0.0
+
+# Optional: I2C sensor access
+# smbus2>=0.4.3
+
+# Optional: MQTT publishing
+# paho-mqtt>=2.0.0

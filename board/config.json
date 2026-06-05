@@ -1,0 +1,47 @@
+{
+  "camera": {
+    "source": "local",
+    "use_gstreamer": true,
+    "remote_url": "http://192.168.7.1:5001/stream",
+    "width": 640,
+    "height": 640,
+    "fps": 30
+  },
+  "model": {
+    "variant": "s",
+    "variants": {
+      "n": "yolov8n",
+      "s": "yolov8s",
+      "m": "yolov8m"
+    },
+    "models_dir": "/opt/models",
+    "labels_path": "/opt/models/labels/coco_labels.txt",
+    "format": "yolov8",
+    "use_npu": true,
+    "npu_delegate_path": "/usr/lib/libneutron_delegate.so",
+    "num_threads": 1
+  },
+  "inference": {
+    "confidence_threshold": 0.5,
+    "iou_threshold": 0.45,
+    "max_detections": 10,
+    "skip_postprocess": false
+  },
+  "streaming": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "jpeg_quality": 75
+  },
+  "overlay": {
+    "box_thickness": 2,
+    "font_scale": 0.6,
+    "show_confidence": true,
+    "show_fps": true
+  },
+  "actions": {
+    "enable_logging": true,
+    "log_file": "/tmp/detections.csv",
+    "alert_classes": ["person", "car"],
+    "alert_min_confidence": 0.7
+  }
+}

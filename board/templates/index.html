@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FRDM-IMX95 Edge AI Vision</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0f0f13;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #1a1a2e;
+      border-bottom: 2px solid #ff6b00;
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    header .logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #ff6b00;
+      letter-spacing: 0.05em;
+    }
+
+    header .subtitle {
+      font-size: 0.85rem;
+      color: #888;
+    }
+
+    header .model-badge {
+      margin-left: auto;
+      background: #ff6b0022;
+      border: 1px solid #ff6b0066;
+      color: #ff6b00;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-family: monospace;
+    }
+
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 16px;
+      padding: 16px;
+      flex: 1;
+    }
+
+    /* Video stream */
+    .stream-container {
+      position: relative;
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #2a2a3e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .stream-container img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .stream-overlay {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      display: flex;
+      gap: 6px;
+    }
+
+    .badge {
+      background: rgba(0,0,0,0.7);
+      border: 1px solid #333;
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 0.75rem;
+      font-family: monospace;
+    }
+
+    .badge.live { border-color: #00cc44; color: #00cc44; }
+    .badge.fps  { color: #aaa; }
+
+    /* Sidebar */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .card {
+      background: #1a1a2e;
+      border: 1px solid #2a2a3e;
+      border-radius: 8px;
+      padding: 14px;
+    }
+
+    .card h3 {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 10px;
+      border-bottom: 1px solid #2a2a3e;
+      padding-bottom: 6px;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-item {
+      background: #12121e;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+
+    .stat-item .value {
+      font-size: 1.4rem;
+      font-weight: 700;
+      font-family: monospace;
+      color: #ff6b00;
+    }
+
+    .stat-item .label {
+      font-size: 0.7rem;
+      color: #666;
+      margin-top: 2px;
+    }
+
+    /* Detections list */
+    #detection-list {
+      list-style: none;
+      max-height: 260px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    #detection-list li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #12121e;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 0.8rem;
+    }
+
+    #detection-list li .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #detection-list li .det-label { flex: 1; color: #ddd; }
+    #detection-list li .det-conf  { color: #ff6b00; font-family: monospace; font-size: 0.75rem; }
+
+    .empty-msg {
+      color: #555;
+      font-size: 0.8rem;
+      text-align: center;
+      padding: 12px 0;
+    }
+
+    /* Pipeline stage latency */
+    .stage-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .stage-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: #12121e;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 0.78rem;
+    }
+
+    .stage-row .stage-label {
+      color: #ff6b00;
+      font-family: monospace;
+      font-weight: 600;
+    }
+
+    .stage-row .stage-avg {
+      color: #ddd;
+      font-family: monospace;
+    }
+
+    /* Camera selector */
+    .camera-select {
+      width: 100%;
+      background: #12121e;
+      color: #e0e0e0;
+      border: 1px solid #2a2a3e;
+      border-radius: 4px;
+      padding: 6px 8px;
+      font-size: 0.8rem;
+      outline: none;
+      cursor: pointer;
+      margin-top: 4px;
+    }
+
+    .camera-select option { background: #12121e; }
+
+    .camera-status {
+      font-size: 0.7rem;
+      color: #666;
+      margin-top: 4px;
+      min-height: 1em;
+    }
+
+    /* Threshold slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .slider-row label { font-size: 0.8rem; color: #aaa; flex: 1; }
+    .slider-row span  { font-family: monospace; font-size: 0.8rem; color: #ff6b00; width: 36px; text-align: right; }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: #2a2a3e;
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: #ff6b00;
+      cursor: pointer;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      padding: 8px;
+      font-size: 0.7rem;
+      color: #444;
+      border-top: 1px solid #1a1a2e;
+    }
+
+    @media (max-width: 800px) {
+      .main-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">&#9632; NXP FRDM-IMX95</div>
+    <div class="subtitle">Edge AI Vision Workshop</div>
+  </div>
+  <div class="model-badge" id="model-name">{{ model_name }}</div>
+</header>
+
+<div class="main-grid">
+
+  <!-- Live stream -->
+  <div class="stream-container">
+    <img src="/stream" alt="Live inference stream" id="stream-img" />
+    <div class="stream-overlay">
+      <span class="badge live">● LIVE</span>
+      <span class="badge fps" id="fps-badge">-- FPS</span>
+    </div>
+  </div>
+
+  <!-- Sidebar -->
+  <div class="sidebar">
+
+    <!-- Camera selector -->
+    <div class="card">
+      <h3>Camera Source</h3>
+      <select id="camera-select" class="camera-select">
+        <option value="">Scanning...</option>
+      </select>
+      <div id="camera-status" class="camera-status"></div>
+    </div>
+
+    <!-- Stats -->
+    <div class="card">
+      <h3>Runtime Stats</h3>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <div class="value" id="stat-fps">--</div>
+          <div class="label">FPS</div>
+        </div>
+        <div class="stat-item">
+          <div class="value" id="stat-detections">0</div>
+          <div class="label">Detections</div>
+        </div>
+        <div class="stat-item">
+          <div class="value" id="stat-invoke">--</div>
+          <div class="label">Invoke ms</div>
+        </div>
+        <div class="stat-item">
+          <div class="value" id="stat-post">--</div>
+          <div class="label">Post ms</div>
+        </div>
+        <div class="stat-item">
+          <div class="value" id="stat-frames">0</div>
+          <div class="label">Frames</div>
+        </div>
+        <div class="stat-item">
+          <div class="value" id="stat-time">--:--</div>
+          <div class="label">Board Time</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pipeline stage latency -->
+    <div class="card">
+      <h3>Pipeline Stages</h3>
+      <div id="stage-latency-list" class="stage-list">
+        <div class="empty-msg">No data</div>
+      </div>
+    </div>
+
+    <!-- Threshold control -->
+    <div class="card">
+      <h3>Confidence Threshold</h3>
+      <div class="slider-row">
+        <label>Min confidence</label>
+        <span id="threshold-value">0.50</span>
+      </div>
+      <input type="range" id="threshold-slider"
+             min="0.1" max="0.95" step="0.05" value="0.50" />
+    </div>
+
+    <!-- Current detections -->
+    <div class="card">
+      <h3>Current Detections</h3>
+      <ul id="detection-list">
+        <li class="empty-msg">No detections</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<footer>
+  Stream: <code>http://192.168.7.2:{{ port }}/stream</code> &nbsp;|&nbsp;
+  Status API: <code>/status</code> &nbsp;|&nbsp;
+  Detections API: <code>/detections</code>
+</footer>
+
+<script>
+  // --- Status polling ---
+  const POLL_INTERVAL_MS = 500;
+  const CLASS_COLORS = [
+    '#00cc44','#3399ff','#ff4444','#ffcc00',
+    '#ff44ff','#ff8800','#aa44ff','#00cccc'
+  ];
+
+  function colorForLabel(label) {
+    let hash = 0;
+    for (let i = 0; i < label.length; i++) hash = label.charCodeAt(i) + ((hash << 5) - hash);
+    return CLASS_COLORS[Math.abs(hash) % CLASS_COLORS.length];
+  }
+
+  async function pollStatus() {
+    try {
+      const res = await fetch('/status');
+      const data = await res.json();
+
+      // Update stats
+      document.getElementById('stat-fps').textContent = data.fps.toFixed(1);
+      document.getElementById('fps-badge').textContent = data.fps.toFixed(1) + ' FPS';
+      document.getElementById('stat-detections').textContent = data.num_detections;
+      document.getElementById('stat-invoke').textContent = data.invoke_ms != null ? data.invoke_ms.toFixed(1) : '--';
+      document.getElementById('stat-post').textContent = data.inference_ms != null ? data.inference_ms.toFixed(1) : '--';
+
+      // Stage latency
+      const stages = data.stage_latency || [];
+      const stageEl = document.getElementById('stage-latency-list');
+      if (stages.length > 0) {
+        stageEl.innerHTML = stages.map(s => `
+          <div class="stage-row">
+            <span class="stage-label">${s.label}</span>
+            <span class="stage-avg">${s.avg_ms != null ? s.avg_ms + ' ms' : '--'}</span>
+          </div>`).join('');
+      } else {
+        stageEl.innerHTML = '<div class="empty-msg">No data</div>';
+      }
+      document.getElementById('stat-frames').textContent = data.total_frames_processed ?? '--';
+
+      const ts = new Date(data.timestamp);
+      document.getElementById('stat-time').textContent =
+        ts.toLocaleTimeString('en-GB', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+      // Update detection list
+      const list = document.getElementById('detection-list');
+      if (data.detections && data.detections.length > 0) {
+        list.innerHTML = data.detections.map(d => `
+          <li>
+            <span class="dot" style="background:${colorForLabel(d.label)}"></span>
+            <span class="det-label">${d.label}</span>
+            <span class="det-conf">${(d.confidence * 100).toFixed(0)}%</span>
+          </li>`).join('');
+      } else {
+        list.innerHTML = '<li class="empty-msg">No detections</li>';
+      }
+    } catch (e) {
+      // Board might be restarting — fail silently
+    }
+  }
+
+  setInterval(pollStatus, POLL_INTERVAL_MS);
+  pollStatus();
+
+  // --- Threshold slider ---
+  const slider = document.getElementById('threshold-slider');
+  const threshVal = document.getElementById('threshold-value');
+
+  slider.addEventListener('input', () => {
+    threshVal.textContent = parseFloat(slider.value).toFixed(2);
+  });
+
+  slider.addEventListener('change', async () => {
+    const val = parseFloat(slider.value);
+    threshVal.textContent = val.toFixed(2);
+    try {
+      await fetch('/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({inference: {confidence_threshold: val}})
+      });
+    } catch (e) {}
+  });
+
+  // --- Camera selector ---
+  async function loadCameras() {
+    try {
+      const res = await fetch('/cameras');
+      const cameras = await res.json();
+      const sel = document.getElementById('camera-select');
+      if (cameras.length === 0) {
+        sel.innerHTML = '<option value="">No cameras found</option>';
+        return;
+      }
+      sel.innerHTML = cameras.map(c =>
+        `<option value="${c.device}" ${c.active ? 'selected' : ''}>${c.name} — ${c.device}</option>`
+      ).join('');
+    } catch(e) {
+      document.getElementById('camera-select').innerHTML = '<option value="">Unavailable</option>';
+    }
+  }
+
+  document.getElementById('camera-select').addEventListener('change', async (e) => {
+    const device = e.target.value;
+    if (!device) return;
+    const status = document.getElementById('camera-status');
+    status.style.color = '#ff6b00';
+    status.textContent = 'Switching...';
+    try {
+      await fetch('/camera', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({device})
+      });
+      status.style.color = '#00cc44';
+      status.textContent = `Active: ${device.split('/').pop()}`;
+    } catch(e) {
+      status.style.color = '#ff4444';
+      status.textContent = 'Switch failed';
+    }
+  });
+
+  loadCameras();
+
+  // --- Reconnect stream on error ---
+  const img = document.getElementById('stream-img');
+  img.addEventListener('error', () => {
+    setTimeout(() => { img.src = '/stream?' + Date.now(); }, 2000);
+  });
+</script>
+
+</body>
+</html>
