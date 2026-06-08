@@ -1,25 +1,11 @@
-# Edge AI Vision Workshop — Facilitator & Participant Guide
-
-**Half-Day Workshop | NXP FRDM-IMX95 Freedom Board**
-**"Vibe-Code Your Way to Edge AI"**
-
----
+# Edge AI Vision Workshop
 
 ## Table of Contents
-
 1. [Workshop Overview](#workshop-overview)
 2. [Learning Objectives](#learning-objectives)
 3. [Prerequisites](#prerequisites)
-4. [Schedule at a Glance](#schedule-at-a-glance)
-5. [Part 0 — Environment Setup (30 min)](#part-0--environment-setup-30-min)
-6. [Part 1 — Introduction & Live Demo (20 min)](#part-1--introduction--live-demo-20-min)
-7. [Part 2 — Code Tour (30 min)](#part-2--code-tour-30-min)
-8. [Part 3 — Lab 1: Guided Challenges (60 min)](#part-3--lab-1-guided-challenges-60-min)
-9. [Part 4 — Lab 2: Open Exploration (40 min)](#part-4--lab-2-open-exploration-40-min)
-10. [Part 5 — Show & Tell (20 min)](#part-5--show--tell-20-min)
-11. [Facilitator Notes](#facilitator-notes)
-12. [Troubleshooting Reference](#troubleshooting-reference)
-
+4. [Models Execution](#models-execution)
+5. [Optimizations](#optimizations)
 ---
 
 ## Workshop Overview
@@ -28,8 +14,8 @@ This workshop puts AI-assisted coding at the center of embedded engineering. Par
 
 The board runs a Python application that:
 - Captures frames from a USB webcam via OpenCV
-- Runs TFLite inference on the eIQ® Neutron NPU (2 TOPS) using a 3-stage pipelined architecture
-- Overlays bounding boxes, inference timing, and HUD data onto frames
+- Runs TFLite inference on the eIQ® Neutron NPU (2 TOPS) using a pipelined execution
+- Overlays bounding boxes, inference timing, and shows statistics in a dashboard
 - Streams the annotated video over WiFi to a browser via Flask MJPEG
 - Exposes a REST API for live configuration
 
@@ -42,7 +28,7 @@ Participants connect their laptops to the board via WiFi, open the live stream i
 By the end of this workshop, participants will be able to:
 
 1. Connect to and work on an embedded Linux board remotely via SSH and VS Code
-2. Understand the structure of a real-time Edge AI inference pipeline
+2. Understand the structure of a prototyped real-time Edge AI inference pipeline
 3. Use AI-assisted coding (Claude Code) to extend an embedded application without starting from scratch
 4. Swap and compare TFLite models running on a hardware NPU
 5. Customize visual overlays, detection logic, and REST API behavior
@@ -60,46 +46,34 @@ By the end of this workshop, participants will be able to:
 ### Board prerequisites (pre-configured by organizers)
 - FRDM-IMX95 booted into Linux
 - USB webcam connected (Logitech C922 or equivalent)
-- `tflite_runtime` pre-installed in the Yocto BSP (exposed via `--system-site-packages`)
+- `tflite_runtime` pre-installed in the Yocto BSP
 
 ### Board WiFi connectivity
 Connect to the board through serial interface (via Putty or any other means) and execute the following commands to connect to the local network:
 
-```wpa_passphrase "${SSID}" "${SSID_PASSWORD}" > /tmp/wpa.conf
+```
+wpa_passphrase "${SSID}" "${SSID_PASSWORD}" > /tmp/wpa.conf
 wpa_supplicant -B -i mlan0 -c /tmp/wpa.conf
 udhcpc -i mlan0
 ```
 
 Check the IP address of the board via:
-```ip addr
+```
+ip addr
 ```
 
-### Model preparation (facilitator-only, done before the workshop)
+### Host environment (pre-workshop)
 
-Models are exported from Ultralytics with full int8 quantization and compiled for the Neutron NPU using the NXP eIQ Toolkit. Run on a **Linux laptop or WSL** terminal:
+Models are exported from Ultralytics with full int8 quantization and compiled for the Neutron NPU using the NXP eIQ Toolkit. Download the eIQ Toolkit manually from [here](https://www.nxp.com/webapp/Download?colCode=EIQ-NEUTRON-SDK-3.1.2-LIN&appType=license) and copy the archive to the top folder of the repository. Run on a **Linux laptop or WSL** terminal:
+
 
 ```bash
 # 1. Install the NXP eIQ Toolkit (contains neutron-converter)
-#    Download from: https://www.nxp.com/design/design-center/software/
-#    eiq-ai-development-environment/
-#    eiq-toolkit-for-end-to-end-model-development-and-deployment:EIQ-TOOLKIT
-#    Then:
-make install-eiq ARCHIVE=/path/to/EIQ-NEUTRON-SDK-3.1.2-LIN.zip
+make install-eiq ARCHIVE=./EIQ-NEUTRON-SDK-3.1.2-LIN.zip
 
 # 2. Install laptop Python dependencies
 make install-deps
-
-# 3. Run the full model pipeline (board must be reachable)
-make model BOARD_IP=${BOARD_IP}
 ```
-
-The pipeline:
-1. Exports `yolov8n.pt` → `yolov8n_full_integer_quant.tflite` (fully int8 quantized — input and output tensors are int8, not float32)
-2. Compiles → `yolov8n_neutron.tflite` using `neutron-converter --target imx95`
-3. SCPs the compiled model + COCO labels to `/opt/models/` on the board
-
-> **Why full integer quantization?** The Neutron NPU requires int8 I/O end-to-end. The standard `int8=True` Ultralytics export keeps float32 I/O (weights quantized only). `full_integer_quant` is the correct variant for NPU acceleration.
-
 
 ### Board Python environment setup
 
@@ -122,26 +96,42 @@ To prepare the inference environment run:
 make board-deploy-app BOARD_IP=${BOARD_IP}
 ```
 
+## Models Execution
+### Compiling
+
+To compile the model and deploy it to the board run the following command:
+
+```bash
+# Run the full model pipeline copying the model via SSH (board must be reachable)
+make model BOARD_IP=${BOARD_IP}
+```
+The pipeline:
+1. Exports and quantize `yolov8s.pt` → `yolov8s_full_integer_quant.tflite` (fully int8 quantized — input and output tensors are int8, not float32)
+2. Compiles → `yolov8s_neutron.tflite` using `neutron-converter --target imx95`
+3. SCPs the compiled model + COCO labels to `/opt/models/` on the board
+
+> **Why full integer quantization?** The Neutron NPU requires int8/uint8 tensors end-to-end.
+
 ### Inference
 To start the application run:
 ```
-make board-start BOARD_IP=172.20.10.6
+make board-start BOARD_IP=${BOARD_IP}
 ```
 
 This command will return an IP address, copy paste it to open it into a browser. You should now see the annotated video from your camera.
 
 ---
 
-## Switching YOLOv8 Model Variants
+## Optimizations
+### Switching YOLOv8 Model Variants
 
-The pipeline supports four YOLOv8 variants out of the box. Larger variants detect more accurately but run slower on the NPU.
+The pipeline supports other YOLOv8 variants out of the box. Larger variants detect more accurately but run slower on the NPU.
 
-| Variant | Key | Parameters | Typical NPU latency |
-|---------|-----|-----------|---------------------|
-| YOLOv8n | `n` | 3.2 M  | fastest |
-| YOLOv8s | `s` | 11.2 M | fast    |
-| YOLOv8m | `m` | 25.9 M | medium  |
-| YOLOv8l | `l` | 43.7 M | slowest |
+| Variant | Key | Parameters | 
+|---------|-----|-----------|
+| YOLOv8n | `n` | 3.2 M  | 
+| YOLOv8s | `s` | 11.2 M |
+| YOLOv8m | `m` | 25.9 M |
 
 ### How to switch
 
@@ -155,14 +145,13 @@ The pipeline supports four YOLOv8 variants out of the box. Larger variants detec
       "n": "yolov8n",
       "s": "yolov8s",
       "m": "yolov8m",
-      "l": "yolov8l"
     },
     "models_dir": "/opt/models"
   }
 }
 ```
 
-Set `"variant"` to `"n"`, `"s"`, `"m"`, or `"l"`.
+Set `"variant"` to `"n"`, `"s"` or `"m"`
 
 **Step 2 — Compile and deploy** the new model (laptop/WSL terminal).  
 `make model` reads the variant automatically from `config.json`:
@@ -187,12 +176,12 @@ The sidebar in the browser will show the active variant in the model badge (top-
 
 ---
 
-## Improving Performance with the Split Pipeline
+### Improving Performance with the Split Pipeline
 
 By default `make model` deploys the model as a single TFLite file. The inference
 loop runs all layers sequentially: CPU pre-processing → NPU → CPU post-processing.
 
-`make model-split-pipeline` splits the compiled model into three separate sub-models
+`make model-split-pipeline` splits the compiled model into separate sub-models
 and runs each in its own thread, overlapping NPU inference with CPU work:
 
 ```
@@ -205,7 +194,7 @@ and post-processing frame N-1 — keeping all three stages busy in parallel.
 
 ### How to enable the split pipeline
 
-Run the following **instead of** (or after) `make model`:
+Run the following after `make model`:
 
 ```bash
 make model-split-pipeline BOARD_IP=${BOARD_IP}
@@ -223,8 +212,8 @@ This will:
 make board-start BOARD_IP=${BOARD_IP}
 ```
 
-The **Pipeline Stages** card in the browser sidebar will show three rows — one per
-stage — with their individual average latencies, confirming pipelined execution is active.
+The **Pipeline Stages** card in the browser sidebar will show N rows, one per
+stage, with their individual average latencies, confirming pipelined execution is active.
 
 > **Note:** the split pipeline requires `tflite-extractor` from the NXP eIQ Toolkit
 > to be available on `PATH` alongside `neutron-converter`.

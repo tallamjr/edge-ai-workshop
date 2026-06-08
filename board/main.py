@@ -68,7 +68,6 @@ def _list_cameras() -> list[dict]:
         pass
     return cameras
 
-
 def resolve_model_path(config: dict) -> str:
     """
     Derive the pipeline.json path from models_dir + variant.
@@ -90,6 +89,34 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Disabling auto-exposure
+# ---------------------------------------------------------------------------
+def set_auto_exposure_on_usb_cameras(device):
+    """
+    set auto_exposure=1 using v4l2-ctl.
+    """
+
+    import subprocess
+    try:
+        subprocess.run(
+            ["v4l2-ctl", "-d", device, "--set-ctrl=auto_exposure=1"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=2
+        )
+        logger.info(f"Set auto_exposure=1 on {device}")
+
+    except subprocess.CalledProcessError as e:
+        logger.error(
+            f"Failed to set auto exposure on {device}: {e.stderr}"
+        )
+    except Exception as e:
+        logger.error(
+            f"Unexpected error on {device}: {e}"
+        )
 
 # ---------------------------------------------------------------------------
 # Config loader
@@ -385,6 +412,7 @@ def run(config: dict) -> None:
             sys.exit(1)
         cam_cfg['device'] = chosen['device']
         logger.info(f"Auto-selected camera: {chosen['name']} ({chosen['device']})")
+        set_auto_exposure_on_usb_cameras(cam_cfg['device'])
 
     # --- Load pipeline and labels first (input shape needed for GStreamer setup) ---
     logger.info("Loading pipeline...")

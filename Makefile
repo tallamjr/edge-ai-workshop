@@ -380,6 +380,7 @@ board-deps:
 	@if ! ping -c 1 -W 3 $(BOARD_IP) >/dev/null 2>&1; then \
 		echo "  [ERROR] Cannot reach board at $(BOARD_IP)."; exit 1; \
 	fi
+	scp board/resolv.conf $(BOARD):/etc/
 	ssh $(SSH_OPTS) $(BOARD) "mkdir -p $(BOARD_APP)"
 	scp board/requirements.txt $(BOARD):$(BOARD_APP)/requirements.txt
 	@echo "  Creating venv at $(BOARD_VENV)..."
