@@ -98,6 +98,7 @@ help:
 	@echo "  make install-eiq ARCHIVE=./file.zip  Install neutron-converter from local archive"
 	@echo "  make net-setup          Configure Ethernet interface for direct board connection"
 	@echo "  make net-check          Test connectivity to the board"
+	@echo "  make install-claude-code  Install Claude Code CLI (requires Node.js/npm)"
 	@echo ""
 	@echo "$(CYAN)Board access:$(RESET)"
 	@echo "  SSH:    ssh root@$(BOARD_IP)"
@@ -515,6 +516,33 @@ net-check:
 		echo "  [FAIL] Board NOT reachable at $(BOARD_IP)"; \
 		echo "  Run: make net-setup"; \
 	fi
+
+# ---------------------------------------------------------------------------
+# Install Claude Code CLI
+# ---------------------------------------------------------------------------
+.PHONY: install-claude-code
+install-claude-code:
+	@echo "$(BOLD)Installing Claude Code CLI...$(RESET)"
+	@NODE_MAJOR=$$(node --version | sed 's/v\([0-9]*\).*/\1/'); \
+	if [ "$$NODE_MAJOR" -lt 18 ]; then \
+		echo "  [WARNING] Node.js $$(node --version) is too old. Claude Code requires Node.js >= 18." && \
+		curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && \
+		sudo apt install -y nodejs; \
+	fi
+	@echo "  npm: $$(npm --version)  node: $$(node --version)"
+	sudo npm install -g @anthropic-ai/claude-code
+	@if [ -n "$(API_KEY)" ]; then \
+		sed -i '/ANTHROPIC_API_KEY/d' ~/.bashrc 2>/dev/null || true; \
+		echo "export ANTHROPIC_API_KEY=$(API_KEY)" >> ~/.bashrc; \
+		echo "  [OK] ANTHROPIC_API_KEY saved to ~/.bashrc"; \
+		echo "  Run: source ~/.bashrc  (or open a new terminal)"; \
+	else \
+		echo "  [INFO] No API key set. Rerun with: make install-claude-code API_KEY=sk-ant-..."; \
+	fi
+	@echo ""
+	@echo "  [OK] Claude Code installed: $$(claude --version 2>/dev/null || echo 'restart terminal to update PATH')"
+	@echo "  Run: claude"
+	@echo ""
 
 # ---------------------------------------------------------------------------
 # Clean generated files

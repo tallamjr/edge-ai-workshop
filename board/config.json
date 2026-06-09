@@ -1,7 +1,7 @@
 {
   "camera": {
     "source": "local",
-    "use_gstreamer": true,
+    "use_gstreamer": false,
     "remote_url": "http://192.168.7.1:5001/stream",
     "width": 640,
     "height": 640,

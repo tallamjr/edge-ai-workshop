@@ -41,7 +41,7 @@ By the end of this workshop, participants will be able to:
 ### Participant prerequisites
 - Laptop with Wi-Fi (for internet + Claude Code)
 - Basic Python familiarity (can read and modify Python code)
-- Claude Code installed and authenticated (`npm install -g @anthropic/claude-code` or via your organization's setup)
+- Claude Code installed and authenticated (`make install-claude-code API_KEY=....`, or manually: `npm install -g @anthropic-ai/claude-code`)
 
 ### Board prerequisites (pre-configured by organizers)
 - FRDM-IMX95 booted into Linux
@@ -81,12 +81,6 @@ If the venv is not yet created on the board:
 
 ```bash
 make board-deps BOARD_IP=${BOARD_IP}
-```
-
-This SCPs `board/requirements.txt` to the board and runs:
-```bash
-python3 -m venv --system-site-packages /home/root/edge_ai_workshop/.venv
-.venv/bin/pip install -r requirements.txt
 ```
 
 ### Board inference environment setup
