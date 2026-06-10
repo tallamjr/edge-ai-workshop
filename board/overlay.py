@@ -26,9 +26,39 @@ COLORS = [
 ]
 
 
+# COCO 17-keypoint skeleton: pairs of keypoint indices to connect with a line.
+# Index order: 0 nose, 1/2 eyes, 3/4 ears, 5/6 shoulders, 7/8 elbows,
+# 9/10 wrists, 11/12 hips, 13/14 knees, 15/16 ankles.
+COCO_SKELETON = [
+    (0, 1), (0, 2), (1, 3), (2, 4), (0, 5), (0, 6), (5, 6),
+    (5, 7), (7, 9), (6, 8), (8, 10), (5, 11), (6, 12), (11, 12),
+    (11, 13), (13, 15), (12, 14), (14, 16),
+]
+
+
 def get_color_for_label(label_id: int) -> tuple:
     """Return a consistent BGR color for a given class ID."""
     return COLORS[label_id % len(COLORS)]
+
+
+def draw_keypoints(frame, keypoints: list, kp_threshold: float = 0.5) -> None:
+    """
+    Draw pose keypoints and the COCO skeleton on the frame (in-place).
+
+    Args:
+        frame: BGR image — modified in-place
+        keypoints: list of 17 [x, y, visibility] entries in frame pixels
+        kp_threshold: minimum visibility to draw a keypoint/limb
+    """
+    for a, b in COCO_SKELETON:
+        if keypoints[a][2] > kp_threshold and keypoints[b][2] > kp_threshold:
+            cv2.line(frame,
+                     (keypoints[a][0], keypoints[a][1]),
+                     (keypoints[b][0], keypoints[b][1]),
+                     (0, 255, 0), 2, cv2.LINE_AA)
+    for x, y, v in keypoints:
+        if v > kp_threshold:
+            cv2.circle(frame, (int(x), int(y)), 3, (0, 0, 255), -1, cv2.LINE_AA)
 
 
 def draw_detection(frame, detection: dict, label: str, config: dict) -> None:
@@ -82,6 +112,10 @@ def draw_detection(frame, detection: dict, label: str, config: dict) -> None:
         thickness=1,
         lineType=cv2.LINE_AA
     )
+
+    # Pose models attach keypoints; draw the skeleton on top of the box.
+    if "keypoints" in detection:
+        draw_keypoints(frame, detection["keypoints"])
 
 
 def draw_all_detections(frame, detections: list[dict], labels: list[str],

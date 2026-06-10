@@ -133,8 +133,28 @@ def invoke_stage(stage: dict, input_tensors: list[np.ndarray]) -> tuple[list[np.
     inp     = stage["input_details"]
     out_det = stage["output_details"]
 
-    for i, tensor in enumerate(input_tensors):
-        interp.set_tensor(inp[i]["index"], tensor)
+    if len(input_tensors) == 1:
+        interp.set_tensor(inp[0]["index"], input_tensors[0])
+    else:
+        # Multi-input stage (e.g. the CPU head after a multi-output NPU
+        # backbone). The converter is free to permute a stage's output order,
+        # so the previous stage's outputs do NOT positionally line up with this
+        # stage's inputs. Route each tensor to the input slot with the matching
+        # shape. YOLOv8 multi-scale feature maps have distinct shapes (different
+        # strides → different spatial dims), so shape is an unambiguous key.
+        remaining = list(inp)
+        for tensor in input_tensors:
+            shape = tuple(tensor.shape)
+            for slot in remaining:
+                if tuple(slot["shape"]) == shape:
+                    interp.set_tensor(slot["index"], tensor)
+                    remaining.remove(slot)
+                    break
+            else:
+                raise ValueError(
+                    f"Stage '{stage['label']}': no free input slot matches tensor "
+                    f"shape {shape}; remaining slots "
+                    f"{[tuple(s['shape']) for s in remaining]}")
     t = time.monotonic()
     interp.invoke()
     elapsed_ms = (time.monotonic() - t) * 1000
@@ -175,6 +195,13 @@ def preprocess_frame(frame, input_details: list) -> np.ndarray:
     elif dtype == np.int8:
         # Full integer quant model: shift uint8 [0,255] → int8 [-128,127]
         input_data = np.expand_dims(rgb.astype(np.int16) - 128, axis=0).astype(np.int8)
+    elif dtype == np.int16:
+        # int16-activation models (used for pose/seg so the confidence head is not
+        # crushed). Quantize the 0-1 normalised input with the tensor's own params.
+        scale, zero_point = input_details[0]["quantization"]
+        norm = rgb.astype(np.float32) / 255.0
+        q = np.round(norm / scale + zero_point)
+        input_data = np.expand_dims(q, axis=0).astype(np.int16)
     else:
         input_data = np.expand_dims(rgb / 255.0, axis=0).astype(np.float32)
 
@@ -253,9 +280,73 @@ _buf_max_scores: np.ndarray | None = None
 _buf_mask:       np.ndarray | None = None
 
 
+# YOLOv8-pose models are exported with a fixed square input; keypoint and box
+# coordinates in the output tensor are in that input-pixel space.
+POSE_INPUT_SIZE = 640
+
+
+def postprocess_pose(raw: np.ndarray, frame, config: dict) -> list[dict]:
+    """
+    Decode a YOLOv8-pose output tensor [1, 56, num_anchors] into detections
+    with keypoints. The 56 channels are 4 box (cx,cy,w,h) + 1 person confidence
+    + 17*3 keypoints (x, y, visibility). Box and keypoint x/y are in the model's
+    input-pixel space (0..POSE_INPUT_SIZE), scaled here to the frame size.
+
+    Returns a list of {bbox, label_id (0=person), confidence, keypoints}, where
+    keypoints is a list of 17 [x, y, visibility] entries in frame pixels.
+    """
+    threshold     = config["inference"]["confidence_threshold"]
+    iou_threshold = config["inference"].get("iou_threshold", 0.45)
+    max_det       = config["inference"]["max_detections"]
+    frame_h, frame_w = frame.shape[:2]
+
+    pred = raw[0]               # [56, num_anchors]
+    conf = pred[4, :]
+    mask = conf >= threshold
+    if not mask.any():
+        return []
+
+    box = pred[:4, mask]
+    cf  = conf[mask]
+    kp  = pred[5:, mask]        # [51, N]
+    sx, sy = frame_w / POSE_INPUT_SIZE, frame_h / POSE_INPUT_SIZE
+
+    cx, cy = box[0] * sx, box[1] * sy
+    hw, hh = box[2] * sx / 2, box[3] * sy / 2
+    xyxy = np.stack([cx - hw, cy - hh, cx + hw, cy + hh], axis=1)
+
+    keep = _nms(xyxy, cf, iou_threshold)
+    keep = sorted(keep, key=lambda i: -cf[i])[:max_det]
+
+    detections = []
+    for i in keep:
+        kpi = kp[:, i].reshape(17, 3)
+        keypoints = [
+            [int(np.clip(kpi[j, 0] * sx, 0, frame_w)),
+             int(np.clip(kpi[j, 1] * sy, 0, frame_h)),
+             float(kpi[j, 2])]
+            for j in range(17)
+        ]
+        detections.append({
+            "bbox": [
+                int(np.clip(xyxy[i, 0], 0, frame_w)),
+                int(np.clip(xyxy[i, 1], 0, frame_h)),
+                int(np.clip(xyxy[i, 2], 0, frame_w)),
+                int(np.clip(xyxy[i, 3], 0, frame_h)),
+            ],
+            "label_id": 0,
+            "confidence": float(cf[i]),
+            "keypoints": keypoints,
+        })
+    return detections
+
+
 def postprocess_detections(raw: np.ndarray, frame, config: dict) -> list[dict]:
     """
     Decode raw YOLOv8 output tensor into structured detections.
+
+    For pose models (config["model"]["task"] == "pose") this delegates to
+    postprocess_pose, which returns detections that also carry "keypoints".
 
     Args:
         raw: float32 tensor [1, 4+num_classes, num_anchors]
@@ -265,6 +356,9 @@ def postprocess_detections(raw: np.ndarray, frame, config: dict) -> list[dict]:
     Returns:
         detections: list of {bbox, label_id, confidence}
     """
+    if config["model"].get("task") == "pose":
+        return postprocess_pose(raw, frame, config)
+
     global _buf_max_scores, _buf_mask
 
     threshold     = config["inference"]["confidence_threshold"]

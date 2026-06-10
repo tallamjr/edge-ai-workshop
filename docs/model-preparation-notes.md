@@ -1,0 +1,187 @@
+# Model preparation notes (hackathon working log)
+
+How the YOLOv8s NPU model was actually built for the FRDM-IMX95, the problems
+hit, and the current state. The clean, reusable scripts referenced here live
+alongside this file in `scripts/`.
+
+## Why we could not just use `make model`
+
+`make model` is designed to run the whole pipeline on ONE x86 Linux box:
+Ultralytics export -> int8 quantize -> `neutron-converter` -> deploy. Our setup
+(Apple Silicon Mac on the board's WiFi + an x86 Linux VM with no working NAT
+internet) broke its assumptions, in three ways:
+
+1. **`neutron-converter` is an x86-64 Linux ELF** and cannot run on the arm64
+   Mac, so `make model` cannot complete on the Mac at all. We split the work:
+   Mac exports + quantizes, the VM runs the converter.
+2. **The int8 quantization step deadlocks on macOS arm64.** Ultralytics' int8
+   export goes onnx2tf -> TensorFlow MLIR quantizer, which hangs at 0% CPU on
+   Apple Silicon. So even the export+quantize half of `make model` never
+   finishes on the Mac. We let the export produce the float `saved_model`, then
+   ran the int8 conversion ourselves with the legacy quantizer
+   (`scripts/quantize_to_int8.py`).
+3. The VM *could* have run `make model` end to end (x86 Linux, no deadlock),
+   **but its NAT internet is broken**, so it cannot download the weights or
+   pip-install Ultralytics. Hence the final arrangement: **Mac exports +
+   quantizes, VM converts, Mac deploys.**
+
+On top of that, the first manual quantization used the wrong calibration input
+range (0-255 instead of 0-1), which produced garbage detections and forced a
+re-quantization (see Gotchas). The `scripts/` here are the cleaned-up result of
+working around all of the above.
+
+## Environment reality
+
+- **Mac (Apple Silicon, arm64)**: on the board's WiFi; the only machine that can
+  reach the board (`192.168.1.236`) and the internet. Runs Ultralytics export
+  and the int8 quantisation. Cannot run `neutron-converter` (it is an x86-64
+  Linux ELF).
+- **Linux VM (UTM, x86_64 Ubuntu 24.04, `192.168.105.5`)**: runs
+  `neutron-converter` (and the rest of the eIQ SDK) offline. No working NAT
+  internet, which is fine because the converter needs none.
+- **Board (`192.168.1.236`, root, no password)**: runs the Python TFLite
+  pipeline (`tflite_runtime` + `/usr/lib/libneutron_delegate.so`).
+
+## Pipeline that works
+
+1. **Export (Mac)** float model from Ultralytics. The int8 step deadlocks on
+   macOS, so we let the export produce the `*_saved_model/` and stop there:
+   ```bash
+   .venv/bin/python -c "from ultralytics import YOLO; YOLO('yolov8s.pt').export(format='tflite', int8=True, imgsz=640)"
+   # exports to models/sources/yolov8s_saved_model/ (float32/float16/dynamic-range tflite + calib npy)
+   ```
+2. **Quantise int8 (Mac)** from the saved_model with correct 0-1 calibration:
+   ```bash
+   .venv/bin/python scripts/quantize_to_int8.py \
+     --saved-model models/sources/yolov8s_saved_model --calib-dir models/calib/calib_coco128 \
+     --output models/work/yolov8s_full_integer_quant.tflite --imgsz 640
+   ```
+3. **Verify (Mac)** before shipping:
+   ```bash
+   .venv/bin/python scripts/verify_tflite_detections.py --image models/calib/calib_coco128/<img>.jpg \
+     --float models/sources/yolov8s_saved_model/yolov8s_float32.tflite \
+     --int8 models/work/yolov8s_full_integer_quant.tflite
+   # float and int8 should report the same classes
+   ```
+4. **NPU compile (VM)**:
+   ```bash
+   scp models/work/yolov8s_full_integer_quant.tflite utm@192.168.105.5:/home/utm/
+   ssh utm@192.168.105.5 '~/edge-ai-workshop/bin/eiq-neutron-sdk-linux-3.1.2/bin/neutron-converter \
+     --input /home/utm/yolov8s_full_integer_quant.tflite \
+     --output /home/utm/yolov8s_neutron.tflite --target imx95'
+   scp utm@192.168.105.5:/home/utm/yolov8s_neutron.tflite models/deploy/
+   ```
+5. **Deploy + run (Mac -> board)**:
+   ```bash
+   make deploy BOARD_IP=192.168.1.236
+   ssh root@192.168.1.236 'cd /home/root/edge_ai_workshop/board; \
+     nohup .venv/bin/python main.py >/tmp/app.log 2>&1 </dev/null & echo $!'
+   # view: http://192.168.1.236:5000
+   ```
+
+## Gotchas (all hit and resolved)
+
+- **Calibration input range** was THE bug behind garbage detections (faces
+  labelled "snowboard"/"cell phone" at 98%). The model expects **0-1** input;
+  calibrating with 0-255 gives input quant scale=1.0 instead of ~1/255, so the
+  board's `(rgb-128)` preprocessing feeds values 255x too large. Calibrate at
+  0-1 -> input scale=1/255, zp=-128.
+- **macOS arm64 int8 deadlock**: TF's MLIR quantizer hangs at 0% CPU. Use
+  `converter.experimental_new_quantizer = False` (legacy quantizer).
+- **`use_gstreamer` must be false** in `board/config.json`: the
+  `imxvideoconvert_g2d` path fails (`g2d_open: Init Dpu Handle fail`) and crashes
+  `main.py` instead of falling back. OpenCV opens `/dev/video4` (the C270) fine.
+- **Do not `pkill -f main.py`** in the same shell that launches `main.py` (the
+  launch command contains "main.py", so pkill kills its own shell). Launch in a
+  separate step, or match a pattern that excludes the launcher.
+
+## Pose / keypoints: mostly on the NPU via a backbone/head split
+
+The earlier conclusion was "pose cannot run on the NPU". That was true *only for
+whole-model conversion*, and it is now superseded. Pose runs **mostly on the NPU**
+by splitting the graph: the heavy backbone/neck goes int8 on the Neutron NPU, and
+only the small head (where int8 does the damage) stays float on the CPU.
+
+### Why whole-model conversion fails (still true)
+
+- **int8 crushes the confidence head to zero.** Verified across five methods (TF
+  legacy per-tensor, TF MLIR per-channel, eIQ per-channel int8 and float output,
+  int8-with-float-fallback). Box and keypoint channels quantise fine but output
+  channel 4 (person confidence) decodes to exactly 0, so nothing is detected. The
+  conf branch's small-magnitude logits are destroyed by int8 *activations*.
+- **int16 activations preserve the conf head but `neutron-converter` cannot
+  compile int16** (`ERROR: Tensor data type invalid!`). The Neutron microcode
+  generator is int8-only for these ops.
+
+The key realisation: the crush is a property of the *head*, not the network. The
+backbone/neck quantise fine. So cut the graph and keep only the head in float.
+
+### The split that works
+
+Cut the ONNX graph at the three neck outputs that feed the head (the natural
+P3/P4/P5 boundary, post-SiLU activations, a clean quantisation boundary):
+
+    /model.15/cv2/act/Mul_output_0   [1,128,80,80]   (P3)
+    /model.18/cv2/act/Mul_output_0   [1,256,40,40]   (P4)
+    /model.21/cv2/act/Mul_output_0   [1,512,20,20]   (P5)
+
+- **backbone** (input -> 3 feature maps): 175 nodes / 45 Conv -> int8 -> Neutron.
+- **head** (3 feature maps -> [1,56,8400]): 100 nodes / 28 Conv -> float32 CPU.
+
+Reusable pipeline (all on the Mac, except neutron-converter on the VM):
+
+    # 1. graph surgery — split pose ONNX at the neck outputs
+    #    (onnx.utils.extract_model; produces models/work/split_pose/backbone.onnx + head.onnx)
+    # 2. onnx2tf both halves to TF (float). head_float32.tflite is the CPU stage.
+    .venv/bin/onnx2tf -i models/work/split_pose/head.onnx     -o models/work/split_pose/head_tf     -osd
+    .venv/bin/onnx2tf -i models/work/split_pose/backbone.onnx -o models/work/split_pose/backbone_tf -osd
+    # 3. int8-quantise ONLY the backbone (legacy quantizer, 0-1 calib, float32 output
+    #    so it hands clean feature maps to the float head)
+    .venv/bin/python scripts/quantize_to_int8.py \
+      --saved-model models/work/split_pose/backbone_tf \
+      --calib-dir models/calib/calib_coco128 \
+      --output models/work/split_pose/backbone_int8.tflite \
+      --imgsz 640 --num-images 128 --output-dtype float32
+    # 4. validate numerically on the Mac (no board needed)
+    .venv/bin/python scripts/validate_split_pose.py \
+      --image models/calib/calib_coco128/coco128/images/train2017/000000000036.jpg
+    # 5. NPU-compile the backbone on the VM
+    scp models/work/split_pose/backbone_int8.tflite utm@192.168.105.5:/home/utm/
+    ssh utm@192.168.105.5 '~/edge-ai-workshop/bin/eiq-neutron-sdk-linux-3.1.2/bin/neutron-converter \
+      --input /home/utm/backbone_int8.tflite --output /home/utm/backbone_neutron.tflite --target imx95'
+    scp utm@192.168.105.5:/home/utm/backbone_neutron.tflite models/work/split_pose/
+
+### Results (validated)
+
+- **Confidence head restored.** On a real person image: float baseline conf 0.825
+  (1 detection), split int8-backbone -> float-head conf **0.821** (1 detection),
+  whole-model int8 **0.000** (0 detections). The split tracks the float baseline
+  across every image tested; whole-model int8 is zero everywhere.
+- **NPU coverage.** `neutron-converter` compiles the backbone at **230/233 ops =
+  98.7%** onto a single Neutron graph (the 3 unconverted ops are the trailing
+  float dequants feeding the head, expected). NPU latency estimate **22 ms**.
+  This is exactly the compile that whole-model int16 pose could not achieve.
+
+### Board wiring note (bug found and fixed)
+
+The backbone's output order ([40x40, 80x80, 20x20]) does NOT positionally match
+the head's input order ([80x80, 40x40, 20x20]): the converter is free to permute
+a multi-output stage. `board/inference.py:invoke_stage` therefore routes each
+feature map to the input slot with the matching shape, not by position. Positional
+chaining (the old behaviour) fed swapped feature maps. Guarded by
+`scripts/test_stage_chaining.py`.
+
+## Current state
+
+- **Detection: YOLOv8s int8 -> Neutron NPU**, ~19.6 FPS. Working, deploy-ready
+  (`models/deploy/yolov8s_neutron.tflite`). See `docs/deployment.md` section 1.
+- **Pose: YOLOv8s-pose split, backbone int8 on NPU + head float on CPU**,
+  deploy-ready (`models/deploy/yolov8s-pose/`: `pipeline.json` +
+  `backbone_neutron.tflite` + `head_float32.tflite`). Numerically validated on the
+  Mac (conf restored to 0.821 vs float 0.825); on-board FPS pending board access.
+  See `docs/deployment.md` section 2.
+- **Segmentation / CenterNet:** same int8 conf/class-head crush. The pose split
+  approach should apply (cut at the neck, mask-proto + coeff head on CPU); not yet
+  built. This is the next target.
+- **IREE CPU-vs-NPU comparison:** see `docs/iree-workflow.md` (public IREE has no
+  Neutron backend; CPU path only).

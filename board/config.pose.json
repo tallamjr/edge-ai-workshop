@@ -8,8 +8,8 @@
     "fps": 30
   },
   "model": {
-    "variant": "s",
-    "task": "detect",
+    "variant": "pose",
+    "task": "pose",
     "variants": {
       "n": "yolov8n",
       "s": "yolov8s",
@@ -43,7 +43,7 @@
   "actions": {
     "enable_logging": true,
     "log_file": "/tmp/detections.csv",
-    "alert_classes": ["person", "car"],
+    "alert_classes": ["person"],
     "alert_min_confidence": 0.7
   }
 }
