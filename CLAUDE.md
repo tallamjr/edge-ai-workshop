@@ -7,14 +7,14 @@ running on the NXP FRDM-IMX95 development board.
 
 ## Hardware Platform
 
-**Board**: NXP FRDM-IMX95  
-**IP address**: `192.168.7.2` (direct Ethernet to your laptop)  
+**Board**: NXP FRDM-IMX95
+**IP address**: `192.168.7.2` (direct Ethernet to your laptop)
 **Web viewer**: http://192.168.7.2:5000 (open in browser)
 
-**Processor**: i.MX 95 — 6× Arm Cortex-A55 @ 1.8 GHz  
-**NPU**: NXP eIQ® Neutron (2 TOPS) — hardware-accelerated ML inference  
-**RAM**: 8 GB LPDDR4X  
-**Camera**: MIPI-CSI at `/dev/video0` (OS08A20, up to 4K)  
+**Processor**: i.MX 95 — 6× Arm Cortex-A55 @ 1.8 GHz
+**NPU**: NXP eIQ® Neutron (2 TOPS) — hardware-accelerated ML inference
+**RAM**: 8 GB LPDDR4X
+**Camera**: MIPI-CSI at `/dev/video0` (OS08A20, up to 4K)
 **OS**: Embedded Linux (Yocto BSP), Python 3.11
 
 ---
@@ -38,6 +38,7 @@ host/                ← runs ON YOUR LAPTOP
 ```
 
 **To run on the board**:
+
 ```bash
 ssh user@192.168.7.2
 cd /home/user/workshop
@@ -51,6 +52,7 @@ python3 main.py
 **Python**: `/usr/bin/python3` (3.11)
 
 **Available packages** (pre-installed):
+
 - `tflite_runtime` — TFLite inference engine
 - `cv2` (opencv-python-headless) — image processing
 - `flask` — web server
@@ -94,8 +96,8 @@ NXP `neutron-converter` tool (part of the eIQ Toolkit). The script
 
 ### Model on the board
 
-| File | Source | Task | Input | Classes |
-|------|--------|------|-------|---------|
+| File                     | Source                                  | Task             | Input        | Classes   |
+| ------------------------ | --------------------------------------- | ---------------- | ------------ | --------- |
 | `yolov8n_neutron.tflite` | Ultralytics YOLOv8n → neutron-converter | Object detection | 320×320 int8 | 80 (COCO) |
 
 Label file: `/opt/models/labels/coco_labels.txt` (80 COCO class names, YOLOv8 order)
@@ -124,6 +126,7 @@ https://www.nxp.com/design/design-center/software/eiq-ai-development-environment
 
 To switch to a different YOLO variant, run `prepare_models.sh MODEL=yolov8s`,
 then update `config.json`:
+
 ```json
 {
   "model": {
@@ -239,8 +242,11 @@ def on_alert_class_detected(detection, label, frame, config):
 ```
 
 Alert classes are configured in `config.json`:
+
 ```json
-{"actions": {"alert_classes": ["person", "car"], "alert_min_confidence": 0.7}}
+{
+  "actions": { "alert_classes": ["person", "car"], "alert_min_confidence": 0.7 }
+}
 ```
 
 ### 2. `overlay.py` — Customize visualization
@@ -270,6 +276,7 @@ draw_roi_zone(frame, zone=(100, 100, 600, 500), label="Restricted Area")
 ```
 
 Can also be updated at runtime via HTTP:
+
 ```bash
 curl -X POST http://192.168.7.2:5000/config \
   -H "Content-Type: application/json" \
@@ -280,16 +287,17 @@ curl -X POST http://192.168.7.2:5000/config \
 
 ## REST API (on the board at port 5000)
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/` | GET | Browser viewer page |
-| `/stream` | GET | MJPEG video stream |
-| `/status` | GET | JSON: fps, model, current detections |
-| `/detections` | GET | JSON: last N detections (add `?n=50`) |
-| `/config` | GET | JSON: current config |
-| `/config` | POST | Update config values (deep merge) |
+| Endpoint      | Method | Description                           |
+| ------------- | ------ | ------------------------------------- |
+| `/`           | GET    | Browser viewer page                   |
+| `/stream`     | GET    | MJPEG video stream                    |
+| `/status`     | GET    | JSON: fps, model, current detections  |
+| `/detections` | GET    | JSON: last N detections (add `?n=50`) |
+| `/config`     | GET    | JSON: current config                  |
+| `/config`     | POST   | Update config values (deep merge)     |
 
 **Example — fetch current detections from the laptop**:
+
 ```python
 import requests
 data = requests.get("http://192.168.7.2:5000/detections?n=20").json()
@@ -344,11 +352,13 @@ publish.single(
 ## Common Patterns
 
 **Filter detections to specific classes only:**
+
 ```python
 persons = [d for d in detections if labels[d["label_id"]] == "person"]
 ```
 
 **Check if a detection is inside an ROI zone:**
+
 ```python
 def bbox_in_zone(bbox, zone):
     x1, y1, x2, y2 = bbox
@@ -358,6 +368,7 @@ def bbox_in_zone(bbox, zone):
 ```
 
 **Save a detection snapshot:**
+
 ```python
 import cv2
 from datetime import datetime
@@ -366,6 +377,7 @@ cv2.imwrite(f"/tmp/snapshot_{ts}.jpg", frame)
 ```
 
 **Count detections per class:**
+
 ```python
 from collections import Counter
 counts = Counter(labels[d["label_id"]] for d in detections)

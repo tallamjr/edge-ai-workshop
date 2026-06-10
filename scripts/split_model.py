@@ -16,19 +16,19 @@ as before; a .json path activates multi-stage pipelined execution with no
 additional configuration.
 
 Usage — analysis only:
-    python scripts/split_model.py --model models_out/yolov8n_neutron.tflite
+    python scripts/split_model.py --model models/deploy/yolov8n_neutron.tflite
 
 Usage — split:
     python scripts/split_model.py \\
-        --model  models_out/yolov8n_neutron.tflite \\
+        --model  models/deploy/yolov8n_neutron.tflite \\
         --split  \\
-        --output-dir models_out/split/
+        --output-dir models/work/split/
 
 Outputs (when --split):
-    models_out/split/pre.tflite      CPU ops before NeutronGraph (omitted if none)
-    models_out/split/npu.tflite      NeutronGraph only
-    models_out/split/post.tflite     CPU ops after NeutronGraph (omitted if none)
-    models_out/split/pipeline.json   Manifest — point model.path here on the board
+    models/work/split/pre.tflite      CPU ops before NeutronGraph (omitted if none)
+    models/work/split/npu.tflite      NeutronGraph only
+    models/work/split/post.tflite     CPU ops after NeutronGraph (omitted if none)
+    models/work/split/pipeline.json   Manifest — point model.path here on the board
 
 Requires tflite-extractor (part of the NXP eIQ Toolkit) on PATH for --split.
 """

@@ -22,7 +22,7 @@
 #   BOARD_IP   — Board IP address (default: 192.168.7.2)
 #   BOARD_USER — SSH user on board (default: user)
 #   BOARD_DIR  — Destination directory on board (default: /opt/models)
-#   OUT_DIR    — Local output directory for generated files (default: ./models_out)
+#   OUT_DIR    — Local output directory for generated files (default: ./models/deploy)
 # =============================================================================
 
 set -euo pipefail
@@ -54,7 +54,7 @@ IMGSZ="${IMGSZ:-640}"
 BOARD_IP="${BOARD_IP:-192.168.7.2}"
 BOARD_USER="${BOARD_USER:-user}"
 BOARD_DIR="${BOARD_DIR:-/opt/models}"
-OUT_DIR="${OUT_DIR:-./models_out}"
+OUT_DIR="${OUT_DIR:-./models/deploy}"
 
 TFLITE_FILE="${MODEL}_full_integer_quant.tflite"
 NEUTRON_FILE="${MODEL}_neutron.tflite"

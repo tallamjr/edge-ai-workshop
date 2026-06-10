@@ -23,7 +23,7 @@
 #   BOARD_DIR  Model destination on board      (default: /opt/models)
 #   BOARD_APP  App directory on board          (default: /home/root/edge_ai_workshop)
 #   BOARD_VENV Python venv on board            (default: $(BOARD_APP)/.venv)
-#   OUT_DIR    Local compiled model output dir (default: ./models_out)
+#   OUT_DIR    Local compiled model output dir (default: ./models/deploy)
 # =============================================================================
 
 # ---------------------------------------------------------------------------
@@ -41,7 +41,7 @@ BOARD_USER ?= root
 BOARD_DIR  ?= /opt/models
 BOARD_APP  ?= /home/root/edge_ai_workshop
 BOARD_VENV ?= $(BOARD_APP)/.venv
-OUT_DIR    ?= ./models_out
+OUT_DIR    ?= ./models/deploy
 
 BOARD        := $(BOARD_USER)@$(BOARD_IP)
 TFLITE_FILE  := $(OUT_DIR)/$(MODEL)_full_integer_quant.tflite
