@@ -1,6 +1,6 @@
 # Host (laptop) Python dependencies
 # Install with:
-#   pip install -r requirements.txt
+#   uv pip install -r requirements.txt        (or: make install-deps)
 
 # HTTP client — used by detection_logger.py and viewer.py threshold control
 requests>=2.31.0

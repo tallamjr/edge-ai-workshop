@@ -56,7 +56,6 @@ SSH_OPTS     := -o ConnectTimeout=5 -o StrictHostKeyChecking=no
 # ---------------------------------------------------------------------------
 VENV     ?= .venv
 VENV_PY  := $(VENV)/bin/python
-VENV_PIP := $(VENV)/bin/pip
 
 # ---------------------------------------------------------------------------
 # ANSI colour helpers (work in WSL bash)
@@ -125,9 +124,9 @@ help:
 venv: $(VENV_PY)
 
 $(VENV_PY):
-	@echo "$(BOLD)Creating Python virtual environment in $(VENV)/ ...$(RESET)"
-	python3 -m venv $(VENV)
-	$(VENV_PIP) install --upgrade pip
+	@command -v uv >/dev/null 2>&1 || { echo "  [ERROR] uv not found. Install it: https://docs.astral.sh/uv/getting-started/installation/"; exit 1; }
+	@echo "$(BOLD)Creating Python virtual environment in $(VENV)/ with uv...$(RESET)"
+	uv venv $(VENV)
 	@echo "  [OK] venv created: $(VENV)/"
 	@echo "  Activate with: source $(VENV)/bin/activate"
 	@echo ""
@@ -161,11 +160,11 @@ check:
 		exit 1; \
 	fi
 
-	@# python3-venv module
-	@if python3 -m venv --help >/dev/null 2>&1; then \
-		echo "  [OK] python3-venv available"; \
+	@# uv (host Python environment manager)
+	@if command -v uv >/dev/null 2>&1; then \
+		echo "  [OK] uv available ($$(uv --version))"; \
 	else \
-		echo "  [WARN] python3-venv not found. Install: sudo apt install python3-venv"; \
+		echo "  [WARN] uv not found. Install: https://docs.astral.sh/uv/getting-started/installation/"; \
 	fi
 
 	@# venv created
@@ -221,9 +220,8 @@ check:
 # ---------------------------------------------------------------------------
 .PHONY: install-deps
 install-deps: venv
-	@echo "$(BOLD)Installing laptop/WSL Python dependencies into $(VENV)/...$(RESET)"
-	$(VENV_PIP) install --upgrade pip
-	$(VENV_PIP) install -r host/requirements.txt
+	@echo "$(BOLD)Installing laptop/WSL Python dependencies into $(VENV)/ with uv...$(RESET)"
+	uv pip install --python $(VENV_PY) -r host/requirements.txt
 	@echo ""
 	@echo "  [OK] Host dependencies installed in $(VENV)/"
 	@echo "  Activate with: source $(VENV)/bin/activate"

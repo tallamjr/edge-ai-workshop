@@ -106,8 +106,8 @@ Label file: `/opt/models/labels/coco_labels.txt` (80 COCO class names, YOLOv8 or
 
 ```bash
 # 1. Export quantized TFLite from Ultralytics
-pip install ultralytics
-yolo export model=yolov8n.pt format=tflite int8=True imgsz=320
+uv pip install ultralytics
+.venv/bin/yolo export model=yolov8n.pt format=tflite int8=True imgsz=320
 # → yolov8n_int8.tflite
 
 # 2. Compile for Neutron NPU (requires eIQ Toolkit — see scripts/detect/prepare_models.sh)
@@ -156,8 +156,8 @@ Start the laptop-side streamer **before** starting `main.py` on the board:
 
 ```bash
 # On the laptop (Linux / WSL / macOS):
-pip install -r host/requirements.txt
-python host/webcam_streamer.py          # streams 640×640 MJPEG at :5001
+uv pip install -r host/requirements.txt
+.venv/bin/python host/webcam_streamer.py          # streams 640×640 MJPEG at :5001
 
 # On the board:
 python board/main.py                    # connects to http://192.168.7.1:5001/stream

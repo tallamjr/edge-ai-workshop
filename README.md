@@ -45,6 +45,7 @@ By the end of this workshop, participants will be able to:
 
 - Laptop with Wi-Fi (for internet + Claude Code)
 - Basic Python familiarity (can read and modify Python code)
+- [`uv`](https://docs.astral.sh/uv/) installed (manages the host Python environment): `curl -LsSf https://astral.sh/uv/install.sh | sh`, or `brew install uv`
 - Claude Code installed and authenticated (`npm install -g @anthropic/claude-code` or via your organization's setup)
 
 ### Board prerequisites (pre-configured by organizers)
@@ -77,7 +78,7 @@ Models are exported from Ultralytics with full int8 quantization and compiled fo
 # 1. Install the NXP eIQ Toolkit (contains neutron-converter)
 make install-eiq ARCHIVE=./EIQ-NEUTRON-SDK-3.1.2-LIN.zip
 
-# 2. Install laptop Python dependencies
+# 2. Install laptop Python dependencies (creates a uv-managed .venv)
 make install-deps
 ```
 
@@ -95,6 +96,10 @@ This SCPs `board/requirements.txt` to the board and runs:
 python3 -m venv --system-site-packages /home/root/edge_ai_workshop/.venv
 .venv/bin/pip install -r requirements.txt
 ```
+
+The board uses its own system `python3` with `--system-site-packages` to reach the
+Yocto BSP's pre-installed `tflite_runtime`, `cv2`, etc. `uv` is a host-only tool
+here; the board has no internet and is not uv-managed.
 
 ### Board inference environment setup
 
