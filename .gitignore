@@ -1,10 +1,14 @@
-# Model artifacts (sources, calib data, intermediates, deploy binaries) are
-# rebuilt by scripts/Makefile and are too large for git. Layout:
-#   models/sources  Ultralytics exports (.pt/.onnx/saved_models)
-#   models/calib    calibration data
-#   models/work     intermediates (int8 tflites, split halves, baselines)
-#   models/deploy   board-ready artifacts (neutron models + manifests + labels)
-models
+# Model artifacts. The sources, calibration data and intermediates are large and
+# rebuilt by scripts/Makefile, so they stay out of git; the board-ready deploy
+# artifacts ARE tracked so they survive without the build machine. Layout:
+#   models/sources  Ultralytics exports (.pt/.onnx/saved_models)   [ignored]
+#   models/calib    calibration data                               [ignored]
+#   models/work     intermediates (int8 tflites, split halves)     [ignored]
+#   models/deploy   board-ready artifacts (neutron + manifests + labels) [TRACKED]
+# Note: ignore models/* (contents), not models (the dir), or the !models/deploy
+# re-include cannot take effect (git will not descend into an excluded directory).
+models/*
+!models/deploy
 models_out
 
 # General

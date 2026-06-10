@@ -1,0 +1,6 @@
+{
+  "pipeline": [
+    {"label": "backbone_npu", "file": "backbone_neutron.tflite", "use_npu": true},
+    {"label": "head_cpu",     "file": "head_float32.tflite",     "use_npu": false}
+  ]
+}

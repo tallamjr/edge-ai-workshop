@@ -80,21 +80,62 @@ working around all of the above.
    # view: http://192.168.1.236:5000
    ```
 
-## Gotchas (all hit and resolved)
+## Gotchas
 
-- **Calibration input range** was THE bug behind garbage detections (faces
-  labelled "snowboard"/"cell phone" at 98%). The model expects **0-1** input;
-  calibrating with 0-255 gives input quant scale=1.0 instead of ~1/255, so the
-  board's `(rgb-128)` preprocessing feeds values 255x too large. Calibrate at
-  0-1 -> input scale=1/255, zp=-128.
-- **macOS arm64 int8 deadlock**: TF's MLIR quantizer hangs at 0% CPU. Use
-  `converter.experimental_new_quantizer = False` (legacy quantizer).
+The biggest lesson from this work: **most of the friction was the toolchain and
+the host environment, not the model.** The model maths was sound. What actually
+cost time was which quantiser runs on which CPU architecture, what the NPU
+compiler will and will not accept, and where each binary is even allowed to run.
+The model-specific surprises (the int8 confidence-head crush) were real but
+fewer. Capture these so the next person does not rediscover them the hard way.
+
+### Toolchain and environment (the expensive ones)
+
+- **The MLIR quantiser deadlocks on macOS arm64, but runs fine on x86 Linux.**
+  Ultralytics' int8 export, and any `TFLiteConverter` with
+  `experimental_new_quantizer = True`, hangs at 0% CPU on Apple Silicon partway
+  through the full-integer stage. The float32/float16 stages finish first, so it
+  looks like it almost worked, then never returns. Two ways out: on the Mac use
+  the **legacy** quantiser (`experimental_new_quantizer = False`, which
+  `scripts/common/quantize_to_int8.py` does); or run the MLIR per-channel
+  quantiser on the **x86 VM**, where it does not deadlock. Detection is fine with
+  the legacy per-tensor quantiser. The per-channel MLIR path only matters if you
+  are chasing the pose/seg head, and even then it does not rescue it (see the
+  int16 entry and the Pose section).
+
+- **`neutron-converter` is an x86-64 Linux ELF.** It cannot run on an arm64 Mac
+  at all. This is the entire reason the x86 VM exists (`docs/utm-vm-setup.md`):
+  build and quantise on the Mac, compile on the VM, deploy from the Mac. Do not
+  burn time trying to make the converter run under Rosetta or a wheel; it is a
+  standalone binary, not a Python package.
+
+- **`neutron-converter` is int8-only; it rejects int16.** int16 activations
+  preserve the pose/seg confidence head (where int8 crushes it to zero), so it is
+  the obvious thing to reach for. But the converter runs all the way through
+  tiling and microcode generation and then fails with
+  `ERROR: Tensor data type invalid!`. So "use int16 to save the head" is a dead
+  end on this NPU, and that rejection is precisely what forced the backbone/head
+  split instead. The failure is late and unhelpful, so recognise it early.
+
+- **Calibration input range must be 0-1, not 0-255.** THE bug behind garbage
+  detections (faces labelled "snowboard"/"cell phone" at 98%). The model expects
+  0-1 input; calibrating with 0-255 gives an input quant scale of 1.0 instead of
+  ~1/255, so the board's `(rgb-128)` preprocessing feeds values 255x too large.
+  Calibrate at 0-1 to get input scale 1/255, zero-point -128.
+
+### Runtime and board
+
 - **`use_gstreamer` must be false** in `board/config.json`: the
   `imxvideoconvert_g2d` path fails (`g2d_open: Init Dpu Handle fail`) and crashes
   `main.py` instead of falling back. OpenCV opens `/dev/video4` (the C270) fine.
 - **Do not `pkill -f main.py`** in the same shell that launches `main.py` (the
   launch command contains "main.py", so pkill kills its own shell). Launch in a
-  separate step, or match a pattern that excludes the launcher.
+  separate step, or match a pattern that excludes the launcher (`[m]ain.py`).
+- **Chain compiled stages by tensor shape, not output index.** A compiler is free
+  to permute a multi-output stage's outputs, so handing them to the next stage by
+  position feeds the wrong tensors. `board/inference.py:invoke_stage` routes by
+  shape; this bit us on the pose backbone -> head handoff (see "Board wiring note"
+  in the Pose section). Applies to any multi-stage NPU/CPU pipeline, not just pose.
 
 ## Pose / keypoints: mostly on the NPU via a backbone/head split
 
@@ -162,6 +203,14 @@ Reusable pipeline (all on the Mac, except neutron-converter on the VM):
   98.7%** onto a single Neutron graph (the 3 unconverted ops are the trailing
   float dequants feeding the head, expected). NPU latency estimate **22 ms**.
   This is exactly the compile that whole-model int16 pose could not achieve.
+- **Why the Mac validation is trustworthy (reusable lesson).** The split is
+  validated on the Mac with the **CPU int8 backbone standing in for the NPU one**.
+  That is faithful: `neutron-converter` compiles the _same_ int8 graph to NPU
+  microcode without changing its numerics, so the CPU int8 model is a numerical
+  proxy for the NPU model (which cannot run on the Mac at all). Only on-NPU latency
+  and any delegate-level quirks remain to confirm on hardware. This proxy is what
+  let us de-risk the whole approach before the slow surgery -> quantise ->
+  VM-compile -> board loop. Validate the cheap proxy first; touch the board last.
 
 ### Board wiring note (bug found and fixed)
 
@@ -186,3 +235,21 @@ chaining (the old behaviour) fed swapped feature maps. Guarded by
   built. Step-by-step extension guide: `docs/adding-segmentation.md`.
 - **IREE CPU-vs-NPU comparison:** see `docs/iree-workflow.md` (public IREE has no
   Neutron backend; CPU path only).
+
+## Open items / not yet validated
+
+- **Pose has not run on the board NPU yet.** It is numerically validated on the
+  Mac and the backbone compiles cleanly (98.7%), but actual on-NPU execution, live
+  correctness, and FPS are unconfirmed. Treat pose as "proven in principle, not
+  yet proven on hardware" until someone runs `docs/deployment.md` section 2 and
+  checks the stream and the two-stage log lines. Detection, by contrast, is
+  measured on the board (~19.6 FPS).
+- **Deploy binaries are tracked; the rest of `models/` is not.** `.gitignore`
+  ignores `models/*` but re-includes `models/deploy` (via `!models/deploy`), so
+  the board-ready artifacts (neutron models, manifests, labels) are
+  version-controlled and survive without the build machine. The sources,
+  calibration data and intermediates (`models/sources`, `models/calib`,
+  `models/work`) stay ignored and are rebuilt by the scripts. Rebuilding the NPU
+  models from scratch still needs the x86 VM (`docs/utm-vm-setup.md`). Note: the
+  ignore rule must be `models/*`, not `models`, or the re-include cannot take
+  effect (git will not descend into an excluded directory).
