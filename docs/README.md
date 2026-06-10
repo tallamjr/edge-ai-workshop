@@ -29,8 +29,8 @@ Neutron NPU from an Apple Silicon Mac.
 
 ## The machines
 
-| Machine | Role |
-| --- | --- |
+| Machine                 | Role                                                                                                    |
+| ----------------------- | ------------------------------------------------------------------------------------------------------- |
 | **Mac** (Apple Silicon) | Ultralytics export, int8 quantisation, validation, deploy to board. Reaches the board and the internet. |
-| **x86 Linux VM** (UTM) | Runs `neutron-converter` / eIQ SDK only. See utm-vm-setup.md. |
-| **Board** (FRDM-IMX95) | Runs the Python TFLite pipeline with the Neutron delegate. |
+| **x86 Linux VM** (UTM)  | Runs `neutron-converter` / eIQ SDK only. See utm-vm-setup.md.                                           |
+| **Board** (FRDM-IMX95)  | Runs the Python TFLite pipeline with the Neutron delegate.                                              |

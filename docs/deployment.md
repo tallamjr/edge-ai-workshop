@@ -20,12 +20,49 @@ restart_board() {
 }
 ```
 
+## Quick test (one-liner)
+
+Already compiled the model (artifacts in `models/deploy/<model>/`) and synced the
+board app once with `make board-deploy-app`? Each line below pushes the model,
+sets the matching config, and restarts the stream. Then view at
+http://192.168.1.236:5000.
+
+**Pose** (backbone on NPU, head on CPU):
+
+```bash
+ssh root@192.168.1.236 'mkdir -p /opt/models/yolov8s-pose' \
+ && scp models/deploy/yolov8s-pose/* root@192.168.1.236:/opt/models/yolov8s-pose/ \
+ && scp board/config.pose.json root@192.168.1.236:/home/root/edge_ai_workshop/board/config.json \
+ && ssh root@192.168.1.236 'pkill -f "[m]ain.py"; sleep 2' \
+ && ssh root@192.168.1.236 'cd /home/root/edge_ai_workshop/board; nohup .venv/bin/python main.py >/tmp/app.log 2>&1 </dev/null & echo started'
+```
+
+**Segmentation** (once implemented and compiled, see `docs/adding-segmentation.md`):
+
+```bash
+ssh root@192.168.1.236 'mkdir -p /opt/models/yolov8s-seg' \
+ && scp models/deploy/yolov8s-seg/* root@192.168.1.236:/opt/models/yolov8s-seg/ \
+ && scp board/config.seg.json root@192.168.1.236:/home/root/edge_ai_workshop/board/config.json \
+ && ssh root@192.168.1.236 'pkill -f "[m]ain.py"; sleep 2' \
+ && ssh root@192.168.1.236 'cd /home/root/edge_ai_workshop/board; nohup .venv/bin/python main.py >/tmp/app.log 2>&1 </dev/null & echo started'
+```
+
+Confirm it came up and is inferring (reports fps, model, and live detections):
+
+```bash
+curl -s http://192.168.1.236:5000/status
+```
+
+The `pkill` and launch are separate `ssh` calls on purpose: one shell running
+both would match its own `main.py` in the launch command and kill itself (see
+Notes).
+
 ## 1. Object detection (YOLOv8s, NPU) — ready
 
 ```bash
 # sync app code + deploy corrected detection model + restart
 make board-deploy-app BOARD_IP=192.168.1.236
-make deploy BOARD_IP=192.168.1.236   # OUT_DIR defaults to models/deploy
+make deploy MODEL=yolov8s BOARD_IP=192.168.1.236   # MODEL=yolov8s matches config variant "s"; OUT_DIR defaults to models/deploy
 ssh root@192.168.1.236 'pkill -f "[m]ain.py"; sleep 2'
 ssh root@192.168.1.236 'cd /home/root/edge_ai_workshop/board; nohup .venv/bin/python main.py >/tmp/app.log 2>&1 </dev/null & echo started'
 # view: http://192.168.1.236:5000
