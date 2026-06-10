@@ -1,11 +1,13 @@
 # Edge AI Vision Workshop
 
 ## Table of Contents
+
 1. [Workshop Overview](#workshop-overview)
 2. [Learning Objectives](#learning-objectives)
 3. [Prerequisites](#prerequisites)
 4. [Models Execution](#models-execution)
 5. [Optimizations](#optimizations)
+
 ---
 
 ## Workshop Overview
@@ -13,6 +15,7 @@
 This workshop puts AI-assisted coding at the center of embedded engineering. Participants use **Claude Code** as a co-pilot to extend a running Edge AI object-detection pipeline on real NXP hardware — no deep ML expertise required.
 
 The board runs a Python application that:
+
 - Captures frames from a USB webcam via OpenCV
 - Runs TFLite inference on the eIQ® Neutron NPU (2 TOPS) using a pipelined execution
 - Overlays bounding boxes, inference timing, and shows statistics in a dashboard
@@ -39,16 +42,19 @@ By the end of this workshop, participants will be able to:
 ## Prerequisites
 
 ### Participant prerequisites
+
 - Laptop with Wi-Fi (for internet + Claude Code)
 - Basic Python familiarity (can read and modify Python code)
 - Claude Code installed and authenticated (`npm install -g @anthropic/claude-code` or via your organization's setup)
 
 ### Board prerequisites (pre-configured by organizers)
+
 - FRDM-IMX95 booted into Linux
 - USB webcam connected (Logitech C922 or equivalent)
 - `tflite_runtime` pre-installed in the Yocto BSP
 
 ### Board WiFi connectivity
+
 Connect to the board through serial interface (via Putty or any other means) and execute the following commands to connect to the local network:
 
 ```
@@ -58,6 +64,7 @@ udhcpc -i mlan0
 ```
 
 Check the IP address of the board via:
+
 ```
 ip addr
 ```
@@ -65,7 +72,6 @@ ip addr
 ### Host environment (pre-workshop)
 
 Models are exported from Ultralytics with full int8 quantization and compiled for the Neutron NPU using the NXP eIQ Toolkit. Download the eIQ Toolkit manually from [here](https://www.nxp.com/webapp/Download?colCode=EIQ-NEUTRON-SDK-3.1.2-LIN&appType=license) and copy the archive to the top folder of the repository. Run on a **Linux laptop or WSL** terminal:
-
 
 ```bash
 # 1. Install the NXP eIQ Toolkit (contains neutron-converter)
@@ -84,12 +90,14 @@ make board-deps BOARD_IP=${BOARD_IP}
 ```
 
 This SCPs `board/requirements.txt` to the board and runs:
+
 ```bash
 python3 -m venv --system-site-packages /home/root/edge_ai_workshop/.venv
 .venv/bin/pip install -r requirements.txt
 ```
 
 ### Board inference environment setup
+
 To prepare the inference environment run:
 
 ```
@@ -97,6 +105,7 @@ make board-deploy-app BOARD_IP=${BOARD_IP}
 ```
 
 ## Models Execution
+
 ### Compiling
 
 To compile the model and deploy it to the board run the following command:
@@ -105,7 +114,9 @@ To compile the model and deploy it to the board run the following command:
 # Run the full model pipeline copying the model via SSH (board must be reachable)
 make model BOARD_IP=${BOARD_IP}
 ```
+
 The pipeline:
+
 1. Exports and quantize `yolov8s.pt` → `yolov8s_full_integer_quant.tflite` (fully int8 quantized — input and output tensors are int8, not float32)
 2. Compiles → `yolov8s_neutron.tflite` using `neutron-converter --target imx95`
 3. SCPs the compiled model + COCO labels to `/opt/models/` on the board
@@ -113,7 +124,9 @@ The pipeline:
 > **Why full integer quantization?** The Neutron NPU requires int8/uint8 tensors end-to-end.
 
 ### Inference
+
 To start the application run:
+
 ```
 make board-start BOARD_IP=${BOARD_IP}
 ```
@@ -123,15 +136,16 @@ This command will return an IP address, copy paste it to open it into a browser.
 ---
 
 ## Optimizations
+
 ### Switching YOLOv8 Model Variants
 
 The pipeline supports other YOLOv8 variants out of the box. Larger variants detect more accurately but run slower on the NPU.
 
-| Variant | Key | Parameters | 
-|---------|-----|-----------|
-| YOLOv8n | `n` | 3.2 M  | 
-| YOLOv8s | `s` | 11.2 M |
-| YOLOv8m | `m` | 25.9 M |
+| Variant | Key | Parameters |
+| ------- | --- | ---------- |
+| YOLOv8n | `n` | 3.2 M      |
+| YOLOv8s | `s` | 11.2 M     |
+| YOLOv8m | `m` | 25.9 M     |
 
 ### How to switch
 
@@ -144,7 +158,7 @@ The pipeline supports other YOLOv8 variants out of the box. Larger variants dete
     "variants": {
       "n": "yolov8n",
       "s": "yolov8s",
-      "m": "yolov8m",
+      "m": "yolov8m"
     },
     "models_dir": "/opt/models"
   }
@@ -153,7 +167,7 @@ The pipeline supports other YOLOv8 variants out of the box. Larger variants dete
 
 Set `"variant"` to `"n"`, `"s"` or `"m"`
 
-**Step 2 — Compile and deploy** the new model (laptop/WSL terminal).  
+**Step 2 — Compile and deploy** the new model (laptop/WSL terminal).
 `make model` reads the variant automatically from `config.json`:
 
 ```bash
@@ -161,6 +175,7 @@ make model BOARD_IP=${BOARD_IP}
 ```
 
 This will:
+
 1. Download the selected model weights from Ultralytics
 2. Export to fully int8 quantized TFLite
 3. Compile for the Neutron NPU with `neutron-converter`
@@ -201,6 +216,7 @@ make model-split-pipeline BOARD_IP=${BOARD_IP}
 ```
 
 This will:
+
 1. Analyze the compiled model to find the NPU/CPU boundary
 2. Split it into `pre.tflite` (CPU) / `npu.tflite` (NPU) / `post.tflite` (CPU)
 3. Generate a `pipeline.json` manifest describing the three stages

@@ -16,14 +16,14 @@ It is split into:
 
 ## 1. Conceptual comparison
 
-| Aspect | eIQ TFLite + Neutron delegate (this repo) | IREE |
-|--------|-------------------------------------------|------|
-| Compilation | `neutron-converter` (offline, x86 only) embeds NPU microcode into a `.tflite`; runtime delegate offloads matching ops | Ahead-of-time `iree-compile` produces a self-contained `.vmfb` (VM FlatBuffer) with the full execution schedule |
-| Runtime on board | `tflite_runtime` interpreter + `libneutron_delegate.so` | `iree-run-module` or a C/C++ app on the IREE HAL runtime |
-| Op not supported by NPU | converter leaves it for CPU within the TFLite graph | compiler lowers it to the `llvm-cpu` backend automatically |
-| Partitioning | implicit, done by the converter | explicit multi-backend target list; compiler partitions and manages CPU/NPU memory hand-off |
-| Host toolchain OS | x86-64 Linux only (`neutron-converter` is an x86 ELF) | `iree-compile` has macOS/arm64 and Linux wheels |
-| Heterogeneous (CPU+GPU+NPU async) | not in this pipeline | a stated IREE/Roofline strength, aimed at LLMs and mixed FP/INT models |
+| Aspect                            | eIQ TFLite + Neutron delegate (this repo)                                                                             | IREE                                                                                                            |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Compilation                       | `neutron-converter` (offline, x86 only) embeds NPU microcode into a `.tflite`; runtime delegate offloads matching ops | Ahead-of-time `iree-compile` produces a self-contained `.vmfb` (VM FlatBuffer) with the full execution schedule |
+| Runtime on board                  | `tflite_runtime` interpreter + `libneutron_delegate.so`                                                               | `iree-run-module` or a C/C++ app on the IREE HAL runtime                                                        |
+| Op not supported by NPU           | converter leaves it for CPU within the TFLite graph                                                                   | compiler lowers it to the `llvm-cpu` backend automatically                                                      |
+| Partitioning                      | implicit, done by the converter                                                                                       | explicit multi-backend target list; compiler partitions and manages CPU/NPU memory hand-off                     |
+| Host toolchain OS                 | x86-64 Linux only (`neutron-converter` is an x86 ELF)                                                                 | `iree-compile` has macOS/arm64 and Linux wheels                                                                 |
+| Heterogeneous (CPU+GPU+NPU async) | not in this pipeline                                                                                                  | a stated IREE/Roofline strength, aimed at LLMs and mixed FP/INT models                                          |
 
 The eIQ path is the officially supported route for standard fully-quantized vision
 models such as YOLOv8. IREE's advantages (heterogeneous async execution, models
@@ -135,9 +135,9 @@ iree-benchmark-module --module=yolov8s_cpu_a55.vmfb --device=local-task
 
 (Filled in once both pipelines run.)
 
-| Pipeline | Device | Model | Latency / FPS | Notes |
-|----------|--------|-------|---------------|-------|
-| eIQ TFLite + Neutron delegate | NPU (Neutron) | YOLOv8s int8 | TBD | reference NPU number |
-| eIQ TFLite (no delegate) | CPU (A55) | YOLOv8s int8 | TBD | `--no-npu` |
-| IREE `.vmfb` | CPU (A55) | YOLOv8s int8 | TBD | open-tooling path |
-| IREE `.vmfb` | NPU (Neutron) | - | not testable with open tooling | needs Roofline backend |
+| Pipeline                      | Device        | Model        | Latency / FPS                  | Notes                  |
+| ----------------------------- | ------------- | ------------ | ------------------------------ | ---------------------- |
+| eIQ TFLite + Neutron delegate | NPU (Neutron) | YOLOv8s int8 | TBD                            | reference NPU number   |
+| eIQ TFLite (no delegate)      | CPU (A55)     | YOLOv8s int8 | TBD                            | `--no-npu`             |
+| IREE `.vmfb`                  | CPU (A55)     | YOLOv8s int8 | TBD                            | open-tooling path      |
+| IREE `.vmfb`                  | NPU (Neutron) | -            | not testable with open tooling | needs Roofline backend |

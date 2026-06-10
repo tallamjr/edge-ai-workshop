@@ -4,8 +4,10 @@
 the same WiFi). **View the stream at:** http://192.168.1.236:5000
 
 All commands run from the repo root on the Mac. The compiled NPU models live in
-`models/deploy/`. The board app code (`board/`) must be synced once after the
-pose changes with `make board-deploy-app`.
+`models/deploy/`. To rebuild them see `docs/model-preparation-notes.md`;
+compiling for the NPU needs the x86 VM described in `docs/utm-vm-setup.md`. The
+board app code (`board/`) must be synced once after the pose changes with
+`make board-deploy-app`.
 
 A safe restart helper (kills the running app without the launcher killing its own
 shell, then relaunches in the background):

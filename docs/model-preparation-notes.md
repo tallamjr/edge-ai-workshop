@@ -20,7 +20,7 @@ internet) broke its assumptions, in three ways:
    finishes on the Mac. We let the export produce the float `saved_model`, then
    ran the int8 conversion ourselves with the legacy quantizer
    (`scripts/quantize_to_int8.py`).
-3. The VM *could* have run `make model` end to end (x86 Linux, no deadlock),
+3. The VM _could_ have run `make model` end to end (x86 Linux, no deadlock),
    **but its NAT internet is broken**, so it cannot download the weights or
    pip-install Ultralytics. Hence the final arrangement: **Mac exports +
    quantizes, VM converts, Mac deploys.**
@@ -37,8 +37,9 @@ working around all of the above.
   and the int8 quantisation. Cannot run `neutron-converter` (it is an x86-64
   Linux ELF).
 - **Linux VM (UTM, x86_64 Ubuntu 24.04, `192.168.105.5`)**: runs
-  `neutron-converter` (and the rest of the eIQ SDK) offline. No working NAT
-  internet, which is fine because the converter needs none.
+  `neutron-converter` (and the rest of the eIQ SDK). Internet depends on the UTM
+  network mode (Shared Network provides NAT internet); the converter needs none
+  either way. How to build this VM: `docs/utm-vm-setup.md`.
 - **Board (`192.168.1.236`, root, no password)**: runs the Python TFLite
   pipeline (`tflite_runtime` + `/usr/lib/libneutron_delegate.so`).
 
@@ -63,7 +64,7 @@ working around all of the above.
      --int8 models/work/yolov8s_full_integer_quant.tflite
    # float and int8 should report the same classes
    ```
-4. **NPU compile (VM)**:
+4. **NPU compile (VM)** (one-time VM setup: `docs/utm-vm-setup.md`):
    ```bash
    scp models/work/yolov8s_full_integer_quant.tflite utm@192.168.105.5:/home/utm/
    ssh utm@192.168.105.5 '~/edge-ai-workshop/bin/eiq-neutron-sdk-linux-3.1.2/bin/neutron-converter \
@@ -97,8 +98,8 @@ working around all of the above.
 
 ## Pose / keypoints: mostly on the NPU via a backbone/head split
 
-The earlier conclusion was "pose cannot run on the NPU". That was true *only for
-whole-model conversion*, and it is now superseded. Pose runs **mostly on the NPU**
+The earlier conclusion was "pose cannot run on the NPU". That was true _only for
+whole-model conversion_, and it is now superseded. Pose runs **mostly on the NPU**
 by splitting the graph: the heavy backbone/neck goes int8 on the Neutron NPU, and
 only the small head (where int8 does the damage) stays float on the CPU.
 
@@ -108,12 +109,12 @@ only the small head (where int8 does the damage) stays float on the CPU.
   legacy per-tensor, TF MLIR per-channel, eIQ per-channel int8 and float output,
   int8-with-float-fallback). Box and keypoint channels quantise fine but output
   channel 4 (person confidence) decodes to exactly 0, so nothing is detected. The
-  conf branch's small-magnitude logits are destroyed by int8 *activations*.
+  conf branch's small-magnitude logits are destroyed by int8 _activations_.
 - **int16 activations preserve the conf head but `neutron-converter` cannot
   compile int16** (`ERROR: Tensor data type invalid!`). The Neutron microcode
   generator is int8-only for these ops.
 
-The key realisation: the crush is a property of the *head*, not the network. The
+The key realisation: the crush is a property of the _head_, not the network. The
 backbone/neck quantise fine. So cut the graph and keep only the head in float.
 
 ### The split that works
