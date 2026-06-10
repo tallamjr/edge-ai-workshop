@@ -46,7 +46,7 @@ By the end of this workshop, participants will be able to:
 - Laptop with Wi-Fi (for internet + Claude Code)
 - Basic Python familiarity (can read and modify Python code)
 - [`uv`](https://docs.astral.sh/uv/) installed (manages the host Python environment): `curl -LsSf https://astral.sh/uv/install.sh | sh`, or `brew install uv`
-- Claude Code installed and authenticated (`npm install -g @anthropic/claude-code` or via your organization's setup)
+- Claude Code installed and authenticated (`make install-claude-code API_KEY=....`, or manually: `npm install -g @anthropic-ai/claude-code`)
 
 ### Board prerequisites (pre-configured by organizers)
 
