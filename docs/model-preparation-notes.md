@@ -182,7 +182,7 @@ chaining (the old behaviour) fed swapped feature maps. Guarded by
   Mac (conf restored to 0.821 vs float 0.825); on-board FPS pending board access.
   See `docs/deployment.md` section 2.
 - **Segmentation / CenterNet:** same int8 conf/class-head crush. The pose split
-  approach should apply (cut at the neck, mask-proto + coeff head on CPU); not yet
-  built. This is the next target.
+  approach applies (cut at the neck, mask-proto + coeff head on CPU); not yet
+  built. Step-by-step extension guide: `docs/adding-segmentation.md`.
 - **IREE CPU-vs-NPU comparison:** see `docs/iree-workflow.md` (public IREE has no
   Neutron backend; CPU path only).

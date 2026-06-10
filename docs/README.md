@@ -15,6 +15,12 @@ Neutron NPU from an Apple Silicon Mac.
 3. **[deployment.md](deployment.md)**: deploying the compiled models to the
    board and running the stream. Detection and pose, step by step.
 
+## Extending
+
+- **[adding-segmentation.md](adding-segmentation.md)**: step-by-step guide for
+  the next person adding the YOLOv8s-seg instance-segmentation model, reusing the
+  pose backbone-on-NPU / head-on-CPU split. Includes the Mac-cannot-compile note.
+
 ## Reference
 
 - **[iree-workflow.md](iree-workflow.md)**: IREE CPU-vs-NPU comparison notes
