@@ -14,7 +14,7 @@ numpy>=1.24.0
 # Web server — used by webcam_streamer.py (laptop webcam → MJPEG for board)
 flask>=2.3.0
 
-# ML model export — used by scripts/prepare_models.sh and make model
+# ML model export — used by scripts/detect/prepare_models.sh and make model
 # Exports YOLOv8 .pt → int8 TFLite for Neutron NPU compilation
 ultralytics>=8.0.0
 
@@ -33,5 +33,5 @@ onnxruntime>=1.16.0
 # Note: the board uses tflite_runtime (lightweight, pre-installed in BSP)
 tensorflow>=2.13.0,<=2.19.0
 
-# FlatBuffers — required by scripts/split_model.py for writing sub-model TFLite files
+# FlatBuffers — required by scripts/common/split_model.py for writing sub-model TFLite files
 flatbuffers>=23.5.26

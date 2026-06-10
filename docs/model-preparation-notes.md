@@ -19,7 +19,7 @@ internet) broke its assumptions, in three ways:
    Apple Silicon. So even the export+quantize half of `make model` never
    finishes on the Mac. We let the export produce the float `saved_model`, then
    ran the int8 conversion ourselves with the legacy quantizer
-   (`scripts/quantize_to_int8.py`).
+   (`scripts/common/quantize_to_int8.py`).
 3. The VM _could_ have run `make model` end to end (x86 Linux, no deadlock),
    **but its NAT internet is broken**, so it cannot download the weights or
    pip-install Ultralytics. Hence the final arrangement: **Mac exports +
@@ -53,13 +53,13 @@ working around all of the above.
    ```
 2. **Quantise int8 (Mac)** from the saved_model with correct 0-1 calibration:
    ```bash
-   .venv/bin/python scripts/quantize_to_int8.py \
+   .venv/bin/python scripts/common/quantize_to_int8.py \
      --saved-model models/sources/yolov8s_saved_model --calib-dir models/calib/calib_coco128 \
      --output models/work/yolov8s_full_integer_quant.tflite --imgsz 640
    ```
 3. **Verify (Mac)** before shipping:
    ```bash
-   .venv/bin/python scripts/verify_tflite_detections.py --image models/calib/calib_coco128/<img>.jpg \
+   .venv/bin/python scripts/detect/verify_tflite_detections.py --image models/calib/calib_coco128/<img>.jpg \
      --float models/sources/yolov8s_saved_model/yolov8s_float32.tflite \
      --int8 models/work/yolov8s_full_integer_quant.tflite
    # float and int8 should report the same classes
@@ -138,13 +138,13 @@ Reusable pipeline (all on the Mac, except neutron-converter on the VM):
     .venv/bin/onnx2tf -i models/work/split_pose/backbone.onnx -o models/work/split_pose/backbone_tf -osd
     # 3. int8-quantise ONLY the backbone (legacy quantizer, 0-1 calib, float32 output
     #    so it hands clean feature maps to the float head)
-    .venv/bin/python scripts/quantize_to_int8.py \
+    .venv/bin/python scripts/common/quantize_to_int8.py \
       --saved-model models/work/split_pose/backbone_tf \
       --calib-dir models/calib/calib_coco128 \
       --output models/work/split_pose/backbone_int8.tflite \
       --imgsz 640 --num-images 128 --output-dtype float32
     # 4. validate numerically on the Mac (no board needed)
-    .venv/bin/python scripts/validate_split_pose.py \
+    .venv/bin/python scripts/pose/validate_split_pose.py \
       --image models/calib/calib_coco128/coco128/images/train2017/000000000036.jpg
     # 5. NPU-compile the backbone on the VM
     scp models/work/split_pose/backbone_int8.tflite utm@192.168.105.5:/home/utm/
@@ -170,7 +170,7 @@ the head's input order ([80x80, 40x40, 20x20]): the converter is free to permute
 a multi-output stage. `board/inference.py:invoke_stage` therefore routes each
 feature map to the input slot with the matching shape, not by position. Positional
 chaining (the old behaviour) fed swapped feature maps. Guarded by
-`scripts/test_stage_chaining.py`.
+`scripts/pose/test_stage_chaining.py`.
 
 ## Current state
 

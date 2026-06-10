@@ -14,7 +14,8 @@ import sys
 import numpy as np
 import tensorflow as tf
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+# scripts/pose/<this file> -> repo root is three levels up.
+ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(ROOT / "board"))
 import inference  # noqa: E402
 

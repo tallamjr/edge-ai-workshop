@@ -11,10 +11,10 @@
 #   4. Copies the compiled model + COCO labels to the board via SCP
 #
 # Usage:
-#   chmod +x scripts/prepare_models.sh
-#   ./scripts/prepare_models.sh                       # defaults
-#   ./scripts/prepare_models.sh MODEL=yolov8s         # larger model
-#   ./scripts/prepare_models.sh BOARD_IP=192.168.7.3  # different board IP
+#   chmod +x scripts/detect/prepare_models.sh
+#   ./scripts/detect/prepare_models.sh                       # defaults
+#   ./scripts/detect/prepare_models.sh MODEL=yolov8s         # larger model
+#   ./scripts/detect/prepare_models.sh BOARD_IP=192.168.7.3  # different board IP
 #
 # Configurable variables (override on command line or by editing below):
 #   MODEL      — Ultralytics model name (default: yolov8n)
@@ -120,12 +120,13 @@ if command -v neutron-converter &>/dev/null; then
     NEUTRON_BIN="neutron-converter"
 fi
 
-# 2) Common relative extraction paths next to this script or CWD
+# 2) Common relative extraction paths next to the repo root or CWD.
+# This script lives in scripts/detect/, so the repo root is two levels up.
 if [[ -z "${NEUTRON_BIN}" ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     for candidate in \
-        "${SCRIPT_DIR}/../eiq-neutron-sdk/bin/neutron-converter" \
-        "${SCRIPT_DIR}/../EIQ-NEUTRON-SDK-3.1.2-LIN/bin/neutron-converter" \
+        "${SCRIPT_DIR}/../../eiq-neutron-sdk/bin/neutron-converter" \
+        "${SCRIPT_DIR}/../../EIQ-NEUTRON-SDK-3.1.2-LIN/bin/neutron-converter" \
         "./eiq-neutron-sdk/bin/neutron-converter" \
         "./EIQ-NEUTRON-SDK-3.1.2-LIN/bin/neutron-converter" \
         "${HOME}/eiq-neutron-sdk/bin/neutron-converter"

@@ -76,7 +76,7 @@ def load_pipeline(config: dict) -> list[dict]:
         output_details list  from get_output_details()
         is_npu         bool  True when this stage uses the NPU delegate
 
-    The manifest format written by scripts/split_model.py:
+    The manifest format written by scripts/common/split_model.py:
         {
           "pipeline": [
             {"label": "pre",  "file": "pre.tflite",  "use_npu": false},

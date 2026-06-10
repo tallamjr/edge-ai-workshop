@@ -92,7 +92,7 @@ interpreter.allocate_tensors()
 Models are **not pre-compiled binaries** — they are sourced from Ultralytics,
 exported as quantized int8 TFLite, then compiled for the Neutron NPU using the
 NXP `neutron-converter` tool (part of the eIQ Toolkit). The script
-`scripts/prepare_models.sh` automates the full pipeline.
+`scripts/detect/prepare_models.sh` automates the full pipeline.
 
 ### Model on the board
 
@@ -110,21 +110,21 @@ pip install ultralytics
 yolo export model=yolov8n.pt format=tflite int8=True imgsz=320
 # → yolov8n_int8.tflite
 
-# 2. Compile for Neutron NPU (requires eIQ Toolkit — see scripts/prepare_models.sh)
+# 2. Compile for Neutron NPU (requires eIQ Toolkit — see scripts/detect/prepare_models.sh)
 neutron-converter --input yolov8n_int8.tflite --output yolov8n_neutron.tflite
 
 # 3. Deploy to board
 scp yolov8n_neutron.tflite user@192.168.7.2:/opt/models/
 
 # OR: run the all-in-one script
-./scripts/prepare_models.sh                  # default: yolov8n, imgsz=320
-./scripts/prepare_models.sh MODEL=yolov8s    # swap to larger model
+./scripts/detect/prepare_models.sh                  # default: yolov8n, imgsz=320
+./scripts/detect/prepare_models.sh MODEL=yolov8s    # swap to larger model
 ```
 
 `neutron-converter` is available from the NXP eIQ Toolkit:
 https://www.nxp.com/design/design-center/software/eiq-ai-development-environment/eiq-toolkit-for-end-to-end-model-development-and-deployment:EIQ-TOOLKIT
 
-To switch to a different YOLO variant, run `prepare_models.sh MODEL=yolov8s`,
+To switch to a different YOLO variant, run `scripts/detect/prepare_models.sh MODEL=yolov8s`,
 then update `config.json`:
 
 ```json

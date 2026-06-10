@@ -14,13 +14,13 @@ cell phone) at high confidence.
 Usage
 -----
     # Compare a float and an int8 model on the same image:
-    python scripts/verify_tflite_detections.py \
+    python scripts/detect/verify_tflite_detections.py \
         --image some.jpg \
         --float models/sources/yolov8s_saved_model/yolov8s_float32.tflite \
         --int8 models/work/yolov8s_full_integer_quant.tflite
 
     # Or check a single model:
-    python scripts/verify_tflite_detections.py --image some.jpg --int8 model.tflite
+    python scripts/detect/verify_tflite_detections.py --image some.jpg --int8 model.tflite
 """
 import argparse
 from collections import Counter

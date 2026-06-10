@@ -29,7 +29,7 @@ host (the converter is an x86-64 ELF; it cannot run on Apple Silicon):
 
 Usage
 -----
-    python scripts/quantize_to_int8.py \
+    python scripts/common/quantize_to_int8.py \
         --saved-model models/sources/yolov8s_saved_model \
         --calib-dir models/calib/calib_coco128 \
         --output models/work/yolov8s_full_integer_quant.tflite \

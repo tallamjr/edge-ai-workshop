@@ -333,7 +333,7 @@ model-split-pipeline: model-analyze model-split model-split-deploy
 .PHONY: model-analyze
 model-analyze:
 	@echo "$(BOLD)Analyzing model op distribution...$(RESET)"
-	$(VENV_PY) scripts/split_model.py --model $(OUT_DIR)/$(MODEL)_neutron.tflite
+	$(VENV_PY) scripts/common/split_model.py --model $(OUT_DIR)/$(MODEL)_neutron.tflite
 
 # ---------------------------------------------------------------------------
 # Split a compiled TFLite into CPU-pre / NPU / CPU-post sub-models for
@@ -349,7 +349,7 @@ SPLIT_DIR ?= $(OUT_DIR)/$(MODEL)
 .PHONY: model-split
 model-split:
 	@echo "$(BOLD)Splitting model for pipelined NPU/CPU execution...$(RESET)"
-	$(VENV_PY) scripts/split_model.py \
+	$(VENV_PY) scripts/common/split_model.py \
 		--model $(OUT_DIR)/$(MODEL)_neutron.tflite \
 		--split \
 		--output-dir $(SPLIT_DIR)

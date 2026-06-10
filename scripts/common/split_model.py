@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scripts/split_model.py
+scripts/common/split_model.py
 
 Analyze a neutron-compiled TFLite model and optionally split it into
 separate sub-models for pipelined CPU / NPU execution.
@@ -16,10 +16,10 @@ as before; a .json path activates multi-stage pipelined execution with no
 additional configuration.
 
 Usage — analysis only:
-    python scripts/split_model.py --model models/deploy/yolov8n_neutron.tflite
+    python scripts/common/split_model.py --model models/deploy/yolov8n_neutron.tflite
 
 Usage — split:
-    python scripts/split_model.py \\
+    python scripts/common/split_model.py \\
         --model  models/deploy/yolov8n_neutron.tflite \\
         --split  \\
         --output-dir models/work/split/

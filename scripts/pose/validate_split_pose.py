@@ -18,10 +18,11 @@ import cv2
 import numpy as np
 import tensorflow as tf
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "board"))
+# scripts/pose/<this file> -> repo root is three levels up.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent.parent / "board"))
 import inference  # noqa: E402  (board decoder, reused as-is)
 
-ROOT = pathlib.Path(__file__).resolve().parent.parent
+ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 
 
 def load_image(path, imgsz=640):
